@@ -1,0 +1,15 @@
+<component name="libraryTable">
+  <library name="lib">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/lib" />
+      <root url="file://$PROJECT_DIR$/lib/commons-codec-1.7" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="file://$PROJECT_DIR$/lib/commons-codec-1.7" />
+    </SOURCES>
+    <jarDirectory url="file://$PROJECT_DIR$/lib" recursive="false" />
+    <jarDirectory url="file://$PROJECT_DIR$/lib/commons-codec-1.7" recursive="false" />
+    <jarDirectory url="file://$PROJECT_DIR$/lib/commons-codec-1.7" recursive="false" type="SOURCES" />
+  </library>
+</component>

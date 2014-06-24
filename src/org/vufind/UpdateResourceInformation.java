@@ -54,25 +54,25 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 	
 	private ProcessorResults results;
 
-	private PreparedStatement	getDistinctRecordIdsStmt;
+    private PreparedStatement getDuplicateRecordIdsStmt;
 
-	private PreparedStatement	getRelatedRecordsStmt;
+    private PreparedStatement getBestResourceVersionStmt;
 
-	private PreparedStatement	deleteResoucePermanentStmt;
+    private PreparedStatement deleteResourcePermanentStmt;
 
-	private PreparedStatement	deleteResouceCallNumberPermanentStmt;
+    private PreparedStatement deleteResourceCallNumberPermanentStmt;
 
-	private PreparedStatement	deleteResouceSubjectPermanentStmt;
+    private PreparedStatement deleteResourceSubjectPermanentStmt;
 
-	private PreparedStatement	transferCommentsStmt;
+    private PreparedStatement transferCommentsStmt;
 
-	private PreparedStatement	transferTagsStmt;
+    private PreparedStatement transferTagsStmt;
 
-	private PreparedStatement	transferRatingsStmt;
+    private PreparedStatement transferRatingsStmt;
 
-	private PreparedStatement	transferReadingHistoryStmt;
+    private PreparedStatement transferReadingHistoryStmt;
 
-	private PreparedStatement	transferUserResourceStmt;
+    private PreparedStatement transferUserResourceStmt;
 	
 	public boolean init(Ini configIni, String serverName, long reindexLogId, Connection vufindConn, Connection econtentConn, Logger logger) {
 		this.logger = logger;

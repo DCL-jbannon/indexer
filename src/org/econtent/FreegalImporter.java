@@ -83,25 +83,28 @@ public class FreegalImporter implements IRecordProcessor {
 						results.incUpdated();
 					}
 
+                    String recordId = record.get("id").toString();
+                    int songsAdded = 0;
 					// Add songs to the database
 					for (Song song : album.getSongs()) {
-						Map<String, Object> item = new HashMap<String, Object>();
-						item.put("recordId", record.get("id"));
-						item.put("link", song.getDownloadUrl());
-						item.put("item_type", "externalMP3");
-						String songNotes = song.getTitle();
-						String songArtist = song.getArtist();
-						if (songArtist != null && !songArtist.equals(album.getAuthor())) {
-							songNotes += " -- " + song.getArtist();
-						}
-						item.put("notes", songNotes);
-						item.put("addedBy", -1);
-						item.put("date_added",
-								(int) (new Date().getTime() / 100));
-						item.put("date_updated",
-								(int) (new Date().getTime() / 100));
-						dao.addEContentItem(item);
+                        EContentItem item = new EContentItem(
+                                null,
+                                recordId,
+                                song.getDownloadUrl(),
+                                "externalMP3",
+                                song.getTitle(),
+                                song.getArtist(),
+                                null,
+                                (int) (new Date().getTime() / 100),
+                                (int) (new Date().getTime() / 100));
+                        dao.addEContentItem(item);
+
+                        if(songsAdded++ % 100 == 0) {
+                            dao.flushEContentItems(false);
+                        }
 					}
+
+                    dao.flushEContentItems(true);
 				}
 			}
 		} catch (ParserConfigurationException e) {

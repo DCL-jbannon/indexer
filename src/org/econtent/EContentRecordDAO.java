@@ -1,9 +1,6 @@
 package org.econtent;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,16 +13,19 @@ import org.apache.log4j.Logger;
  * Data access object for the EContentRecord.
  */
 public class EContentRecordDAO {
-	private static Logger logger = Logger.getLogger(EContentRecordDAO.class);
-	private static Connection connection = null;
-	private static EContentRecordDAO instance = null;
+    private static EContentRecordDAO instance = null;
+
+    private Logger logger = null;
+	private Connection connection = null;
+    private PreparedStatement insertEcontentItemPS = null;
 
 	private final Map<Long, Double> ratingsCache;
 	private final Map<Long, List<String>> itemTypesCache;
 
-	protected EContentRecordDAO() {
+	private EContentRecordDAO() {
 		ratingsCache = new HashMap<Long, Double>();
 		itemTypesCache = new HashMap<Long, List<String>>();
+        instance.logger = Logger.getLogger(EContentRecordDAO.class);
 	}
 
 	/**
@@ -33,8 +33,10 @@ public class EContentRecordDAO {
 	 * 
 	 * @param connection
 	 */
-	public static void initialize(Connection connection) {
-		EContentRecordDAO.connection = connection;
+	public static void initialize(Connection connection) throws SQLException {
+        EContentRecordDAO instance = getInstance();
+        instance.connection = connection;
+        EContentRecordDAO.instance = instance;
 	}
 
 	/**
@@ -43,12 +45,12 @@ public class EContentRecordDAO {
 	 * @return
 	 */
 	public static EContentRecordDAO getInstance() {
-		if (connection == null) {
-			throw new IllegalStateException(EContentRecordDAO.class.getName()
-					+ " initialize class method has not been called.");
-		}
 		if (instance == null) {
 			instance = new EContentRecordDAO();
+            if (instance.connection == null) {
+                throw new IllegalStateException(EContentRecordDAO.class.getName()
+                        + " initialize class method has not been called.");
+            }
 		}
 		return instance;
 	}
@@ -232,39 +234,57 @@ public class EContentRecordDAO {
 	/**
 	 * Add an item record to an existing eContent record.
 	 * 
-	 * @param properties
-	 * @return
+	 * @param item
 	 * @throws SQLException
 	 */
-	public long addEContentItem(Map<String, Object> item) throws SQLException {
-		String columnList = "";
-		String paramList = "";
-		String separator = "";
-		Set<String> columns = item.keySet();
-		for (String column : columns) {
-			columnList += separator + column;
-			paramList += separator + "?";
-			separator = ",";
-		}
-		String query = "INSERT INTO econtent_item " + "(" + columnList + ") "
-				+ "VALUES " + "(" + paramList + ")";
-		logger.debug(query);
-		PreparedStatement stmt = connection.prepareStatement(query,
-				PreparedStatement.RETURN_GENERATED_KEYS);
-		int index = 1;
-		for (String column : item.keySet()) {
-			setEContentItemParameter(stmt, index++, column, item);
-		}
-		stmt.executeUpdate();
-		ResultSet generatedKeys = stmt.getGeneratedKeys();
-		long id = -1;
-		if (generatedKeys.next()) {
-			id = generatedKeys.getLong(1);
-		}
-		stmt.close();
-		item.put("id", id);
-		return id;
+	public void addEContentItem(EContentItem item) throws SQLException {
+        if(this.insertEcontentItemPS == null || this.insertEcontentItemPS.isClosed()) {
+            String query = "INSERT INTO econtent_item " +
+                    "(recordId, link, type, notes, artist, addedBy, dateAdded, dateUpdated) " +
+                    "VALUES (?,?,?,?,?,?,?,?)";
+            this.insertEcontentItemPS = connection.prepareStatement(query, PreparedStatement.NO_GENERATED_KEYS);
+        }
+        this.insertEcontentItemPS.setString(1, item.getRecordId());
+        this.insertEcontentItemPS.setString(2, item.getLink());
+        this.insertEcontentItemPS.setString(3, item.getType());
+        if(item.getNotes()==null) {
+            this.insertEcontentItemPS.setNull(4, Types.VARCHAR);
+        } else {
+            this.insertEcontentItemPS.setString(4, item.getNotes());
+        }
+        if(item.getArtist()==null) {
+            this.insertEcontentItemPS.setNull(5, Types.VARCHAR);
+        } else {
+            this.insertEcontentItemPS.setString(5, item.getArtist());
+        }
+        if(item.getAddedBy()==null) {
+            this.insertEcontentItemPS.setNull(6, Types.VARCHAR);
+        } else {
+            this.insertEcontentItemPS.setString(6, item.getAddedBy());
+        }
+        //TODO should we really be handling dates as ints?
+        if(item.getDateAdded() > 0) {
+            this.insertEcontentItemPS.setNull(7, Types.BIGINT);
+        } else {
+            this.insertEcontentItemPS.setInt(7, item.getDateAdded());
+        }
+        if(item.getDateUpdated() > 0) {
+            this.insertEcontentItemPS.setNull(8, Types.BIGINT);
+        } else {
+            this.insertEcontentItemPS.setInt(8, item.getDateUpdated());
+        }
+
+        this.insertEcontentItemPS.addBatch();
 	}
+
+    public void flushEContentItems(boolean clean) throws SQLException {
+        this.insertEcontentItemPS.executeBatch();
+        if(clean) {
+            this.insertEcontentItemPS.close();
+            this.insertEcontentItemPS = null;
+        }
+
+    }
 
 	/**
 	 * Set all Freegal econtent record status to "deleted".
