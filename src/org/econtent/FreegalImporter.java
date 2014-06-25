@@ -3,10 +3,7 @@ package org.econtent;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -34,78 +31,20 @@ public class FreegalImporter implements IRecordProcessor {
 			EContentRecordDAO dao = EContentRecordDAO.getInstance();
 			Collection<String> genres = freegalAPI.getAllGenres();
 			logger.info("Freegal Gender Number: " + genres.size());
-			
+            int songsAdded = 0;
+
+            // Remove all existing songs for the album from the
+            // database since freegal doesn't keep unique ids
+            dao.deleteFreegalItems();
 			for (String genre : genres) {
-				Collection<Album> albums = freegalAPI.getAlbums(genre);
-				for (Album album : albums) {
-					// increment number of econtent record processed
-					results.incEContentRecordsProcessed();
+                ArrayList<Album> albums = new ArrayList(freegalAPI.getAlbums(genre));
 
-					logger.info("Processing album " + album.getTitle()
-							+ " the album has " + album.getSongs().size()
-							+ " songs");
-					EContentRecord record = dao.findByTitleAndAuthor(
-							album.getTitle(), album.getAuthor());
-					boolean added = false;
-					if (record == null) {
-						// create new record
-						record = new EContentRecord();
-						record.set("date_added",
-								(int) (new Date().getTime() / 100));
-						record.set("addedBy", -1);
-						record.set("accessType", "free");
-						record.set("source", "Freegal");
-						record.set("availableCopies", 1);
-						added = true;
-					} else {
-						// Remove all existing songs for the album from the
-						// database since freegal doesn't keep unique ids
-						dao.deleteItems(record.getInteger("id"));
-
-						// set date updated
-						record.set("date_updated",
-								(int) (new Date().getTime() / 100));
-					}
-					record.set("status", "active");
-					record.set("title", album.getTitle());
-					record.set("author", album.getAuthor());
-					record.set("author2", album.getAuthor2());
-					record.set("contents", album.getContents());
-					record.set("language", album.getLanguage());
-					record.set("genre", album.getGenre());
-					record.set("collection", album.getCollection());
-					record.set("cover", album.getCoverUrl());
-					dao.save(record);
-
-					if (added) {
-						results.incAdded();
-					} else {
-						results.incUpdated();
-					}
-
-                    String recordId = record.get("id").toString();
-                    int songsAdded = 0;
-					// Add songs to the database
-					for (Song song : album.getSongs()) {
-                        EContentItem item = new EContentItem(
-                                null,
-                                recordId,
-                                song.getDownloadUrl(),
-                                "externalMP3",
-                                song.getTitle(),
-                                song.getArtist(),
-                                null,
-                                (int) (new Date().getTime() / 100),
-                                (int) (new Date().getTime() / 100));
-                        dao.addEContentItem(item);
-
-                        if(songsAdded++ % 100 == 0) {
-                            dao.flushEContentItems(false);
-                        }
-					}
-
-                    dao.flushEContentItems(true);
-				}
+                int partitionSize = 100;
+                for(int i = 0; albums.size() > i*partitionSize; i++) {
+                    Collection<Album> partition = albums.subList(i*partitionSize,
+                            (i+1)*partitionSize < albums.size() -1 ? (i+1)*partitionSize : albums.size() -1);
+                    processAlbumPartition(partition);
+                }
 			}
 		} catch (ParserConfigurationException e) {
 			logger.error("Error downloading Freegal contents.", e);
@@ -126,6 +65,82 @@ public class FreegalImporter implements IRecordProcessor {
 			results.incErrors();
 		}
 	}
+
+    private void syncEContentRecordsInDB(Collection<Album> albums) throws SQLException{
+        for (Album album : albums) {
+            // increment number of econtent record processed
+            results.incEContentRecordsProcessed();
+
+            logger.info("Processing album " + album.getTitle()
+                    + " the album has " + album.getSongs().size()
+                    + " songs");
+            EContentRecord record = dao.findByTitleAndAuthor(
+                    album.getTitle(), album.getAuthor());
+            boolean added = false;
+            if (record == null) {
+                // create new record
+                record = new EContentRecord();
+                record.set("date_added",
+                        (int) (new Date().getTime() / 100));
+                record.set("addedBy", -1);
+                record.set("accessType", "free");
+                record.set("source", "Freegal");
+                record.set("availableCopies", 1);
+                added = true;
+            } else {
+
+                // set date updated
+                record.set("date_updated",
+                        (int) (new Date().getTime() / 100));
+            }
+            record.set("status", "active");
+            record.set("title", album.getTitle());
+            record.set("author", album.getAuthor());
+            record.set("author2", album.getAuthor2());
+            record.set("contents", album.getContents());
+            record.set("language", album.getLanguage());
+            record.set("genre", album.getGenre());
+            record.set("collection", album.getCollection());
+            record.set("cover", album.getCoverUrl());
+            dao.save(record);
+
+            if (added) {
+                results.incAdded();
+            } else {
+                results.incUpdated();
+            }
+        }
+    }
+    private void processAlbumPartition(Collection<Album> albums) throws SQLException {
+        int songsAdded = 0;
+        for (Album album : albums) {
+            syncEContentRecordsInDB(albums);
+            EContentRecord record = dao.findByTitleAndAuthor(
+                    album.getTitle(), album.getAuthor());
+            String recordId = record.get("id").toString();
+
+            // Add songs to the database
+            for (Song song : album.getSongs()) {
+                String notes = song.getTitle();
+                String songArtist = song.getArtist();
+                if (songArtist != null && !songArtist.equals(album.getAuthor())) {
+                    notes += " -- " + song.getArtist();
+                }
+
+                EContentItem item = new EContentItem(
+                        null,
+                        recordId,
+                        song.getDownloadUrl(),
+                        "externalMP3",
+                        notes,
+                        null,
+                        (int) (new Date().getTime() / 100),
+                        (int) (new Date().getTime() / 100));
+                dao.addEContentItem(item);
+            }
+        }
+        dao.flushEContentItems(false);
+    }
 
 	@Override
 	public boolean init(Ini configIni, String serverName, long reindexLogId,

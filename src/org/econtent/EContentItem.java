@@ -12,19 +12,17 @@ public class EContentItem {
     private String link = null;
     private String type = null;
     private String notes = null;
-    private String artist = null;
     private String addedBy = null;
     private int dateAdded = -1;
     private int dateUpdated = -1;
 
-    public EContentItem(String itemId, String recordId, String link, String type, String notes, String artist, String addedBy, int dateAdded, int dateUpdated) {
+    public EContentItem(String itemId, String recordId, String link, String type, String notes, String addedBy, int dateAdded, int dateUpdated) {
         this.itemId = itemId;
         this.recordId = recordId;
         this.link = link;
         this.type = type;
         this.notes = notes;
-        this.artist = artist;
-        this.addedBy = addedBy;
+        this.addedBy = addedBy == null ? "-1":addedBy;
         this.dateAdded = dateAdded;
         this.dateUpdated = dateUpdated;
     }
@@ -67,14 +65,6 @@ public class EContentItem {
 
     public void setNotes(String notes) {
         this.notes = notes;
-    }
-
-    public String getArtist() {
-        return artist;
-    }
-
-    public void setArtist(String artist) {
-        this.artist = artist;
     }
 
     public String getAddedBy() {

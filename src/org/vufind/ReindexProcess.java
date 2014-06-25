@@ -569,7 +569,13 @@ public class ReindexProcess {
 		}
 
 		// Initialize EContentRecordDAO class
-		EContentRecordDAO.initialize(econtentConn);
+        try {
+            EContentRecordDAO.initialize(econtentConn);
+        } catch (SQLException e) {
+            logger.error("Unable to create log entry for reindex process", e);
+            System.exit(0);
+        }
+
 
 		// Start a reindex log entry
 		try {

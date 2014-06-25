@@ -25,18 +25,17 @@ public class EContentRecordDAO {
 	private EContentRecordDAO() {
 		ratingsCache = new HashMap<Long, Double>();
 		itemTypesCache = new HashMap<Long, List<String>>();
-        instance.logger = Logger.getLogger(EContentRecordDAO.class);
+        logger = Logger.getLogger(EContentRecordDAO.class);
 	}
 
 	/**
 	 * Setup this class before it can be used. Should be called only once.
-	 * 
+	 *
 	 * @param connection
 	 */
 	public static void initialize(Connection connection) throws SQLException {
-        EContentRecordDAO instance = getInstance();
+        instance = new EContentRecordDAO();
         instance.connection = connection;
-        EContentRecordDAO.instance = instance;
 	}
 
 	/**
@@ -45,13 +44,6 @@ public class EContentRecordDAO {
 	 * @return
 	 */
 	public static EContentRecordDAO getInstance() {
-		if (instance == null) {
-			instance = new EContentRecordDAO();
-            if (instance.connection == null) {
-                throw new IllegalStateException(EContentRecordDAO.class.getName()
-                        + " initialize class method has not been called.");
-            }
-		}
 		return instance;
 	}
 
@@ -108,6 +100,22 @@ public class EContentRecordDAO {
 		stmt.close();
 	}
 
+    /**
+     * DELETEs all Freegal econtent_item since we get everything new with each Freegal update
+     * @throws SQLException
+     */
+    public void deleteFreegalItems() throws SQLException {
+        PreparedStatement stmt = connection
+                .prepareStatement(
+                        "DELETE ei\n" +
+                        "    FROM dclecontent_prod.econtent_item ei, dclecontent_prod.econtent_record er\n" +
+                        "    WHERE\n" +
+                        "    er.id = ei.recordId\n" +
+                        "    AND er.source = 'Freegal'");
+        stmt.executeUpdate();
+        stmt.close();
+    }
+
 	/**
 	 * Find a record given its ID.
 	 * 
@@ -129,6 +137,24 @@ public class EContentRecordDAO {
 		return record;
 	}
 
+    private HashMap<String, EContentRecord> allRecords = null;
+
+    private HashMap<String, EContentRecord> selectAllFreegalRecordsInDB() throws SQLException {
+        if(allRecords==null) {
+            allRecords = new HashMap<String, EContentRecord>();
+            PreparedStatement stmt = connection
+                    .prepareStatement("SELECT * FROM econtent_record WHERE source = 'Freegal'");
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                allRecords.put( rs.getString("title")+rs.getString("author"), new EContentRecord(rs));
+            }
+            rs.close();
+            stmt.close();
+        }
+
+        return allRecords;
+    }
+
 	/**
 	 * Find a record by title and author.
 	 * 
@@ -139,18 +165,9 @@ public class EContentRecordDAO {
 	 */
 	public EContentRecord findByTitleAndAuthor(String title, String author)
 			throws SQLException {
-		EContentRecord record = null;
-		PreparedStatement stmt = connection
-				.prepareStatement("select * from econtent_record where title=? and author=?");
-		stmt.setString(1, title);
-		stmt.setString(2, author);
-		ResultSet rs = stmt.executeQuery();
-		if (rs.next()) {
-			record = new EContentRecord(rs);
-		}
-		rs.close();
-		stmt.close();
-		return record;
+        HashMap<String, EContentRecord> allRecords = selectAllFreegalRecordsInDB();
+
+		return allRecords.get(title+author);
 	}
 
 	/**
@@ -240,8 +257,8 @@ public class EContentRecordDAO {
 	public void addEContentItem(EContentItem item) throws SQLException {
         if(this.insertEcontentItemPS == null || this.insertEcontentItemPS.isClosed()) {
             String query = "INSERT INTO econtent_item " +
-                    "(recordId, link, type, notes, artist, addedBy, dateAdded, dateUpdated) " +
-                    "VALUES (?,?,?,?,?,?,?,?)";
+                    "(recordId, link, item_type, notes, addedBy, date_added, date_updated) " +
+                    "VALUES (?,?,?,?,?,?,?)";
             this.insertEcontentItemPS = connection.prepareStatement(query, PreparedStatement.NO_GENERATED_KEYS);
         }
         this.insertEcontentItemPS.setString(1, item.getRecordId());
@@ -250,28 +267,24 @@ public class EContentRecordDAO {
         if(item.getNotes()==null) {
             this.insertEcontentItemPS.setNull(4, Types.VARCHAR);
         } else {
+
             this.insertEcontentItemPS.setString(4, item.getNotes());
         }
-        if(item.getArtist()==null) {
+        if(item.getAddedBy()==null) {
             this.insertEcontentItemPS.setNull(5, Types.VARCHAR);
         } else {
-            this.insertEcontentItemPS.setString(5, item.getArtist());
-        }
-        if(item.getAddedBy()==null) {
-            this.insertEcontentItemPS.setNull(6, Types.VARCHAR);
-        } else {
-            this.insertEcontentItemPS.setString(6, item.getAddedBy());
+            this.insertEcontentItemPS.setString(5, item.getAddedBy());
         }
         //TODO should we really be handling dates as ints?
-        if(item.getDateAdded() > 0) {
-            this.insertEcontentItemPS.setNull(7, Types.BIGINT);
+        if(item.getDateAdded() > -1) {
+            this.insertEcontentItemPS.setInt(6, item.getDateAdded());
         } else {
-            this.insertEcontentItemPS.setInt(7, item.getDateAdded());
+            this.insertEcontentItemPS.setNull(6, Types.BIGINT);
         }
-        if(item.getDateUpdated() > 0) {
-            this.insertEcontentItemPS.setNull(8, Types.BIGINT);
+        if(item.getDateUpdated() > -1) {
+            this.insertEcontentItemPS.setInt(7, item.getDateUpdated());
         } else {
-            this.insertEcontentItemPS.setInt(8, item.getDateUpdated());
+            this.insertEcontentItemPS.setNull(7, Types.BIGINT);
         }
 
         this.insertEcontentItemPS.addBatch();
