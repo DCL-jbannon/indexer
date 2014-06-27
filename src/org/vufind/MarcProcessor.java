@@ -100,10 +100,9 @@ public class MarcProcessor {
 	private String												sharedEContentLocation;
 	private boolean												scrapeItemsForLinks;
 
-	public static final int								RECORD_CHANGED			= 1;
-	public static final int								RECORD_UNCHANGED		= 2;
-	public static final int								RECORD_NEW					= 3;
-	public static final int								RECORD_DELETED			= 4;
+    public static enum RecordStatus {
+        RECORD_CHANGED, RECORD_UNCHANGED, RECORD_NEW, RECORD_DELETED
+    }
 
 	private Ini configIni;
 	private Connection econtentConn;
@@ -648,11 +647,12 @@ public class MarcProcessor {
 				try {
 					// Loop through each record
 					Record record = reader.next();
+
 					// Process record
 					MarcRecordDetails marcInfo = mapMarcInfo(record, logger);
 					if (marcInfo != null) {
 						// Check to see if the record has been loaded before
-						int recordStatus;
+                        RecordStatus recordStatus;
 						String id = marcInfo.getId();
 						if (id == null) {
 							System.out.println("Could not load id for marc record " + recordNumber);
@@ -661,27 +661,32 @@ public class MarcProcessor {
 							System.exit(1);
 						}
 						MarcIndexInfo marcIndexedInfo = null;
-						if (marcIndexInfo.containsKey(marcInfo.getId())) {
+                        if(record.getLeader().getRecordStatus()=='d') {
+                            //deleted record
+                            logger.debug("Record is deleted");
+                            recordStatus = RecordStatus.RECORD_DELETED;
+
+                        } else if (marcIndexInfo.containsKey(marcInfo.getId())) {
 							marcIndexedInfo = marcIndexInfo.get(marcInfo.getId());
 							if (marcInfo.getChecksum() != marcIndexedInfo.getChecksum()){
 								logger.debug("Record is changed - checksum");
-								recordStatus = RECORD_CHANGED;
+								recordStatus = RecordStatus.RECORD_CHANGED;
 							}else if (marcInfo.getChecksum() != marcIndexedInfo.getBackupChecksum()){
 								logger.debug("Record is changed - backup checksum");
-								recordStatus = RECORD_CHANGED;
+								recordStatus = RecordStatus.RECORD_CHANGED;
 							}else if (marcInfo.isEContent() != marcIndexedInfo.isEContent()){
 								logger.debug("Record is changed - econtent");
-								recordStatus = RECORD_CHANGED;
+								recordStatus = RecordStatus.RECORD_CHANGED;
 							}else if (marcInfo.isEContent() != marcIndexedInfo.isBackupEContent()) {
 								logger.debug("Record is changed - backup econtent");
-								recordStatus = RECORD_CHANGED;
+								recordStatus = RecordStatus.RECORD_CHANGED;
 							} else {
 								// logger.info("Record is unchanged");
-								recordStatus = RECORD_UNCHANGED;
+								recordStatus = RecordStatus.RECORD_UNCHANGED;
 							}
 						} else {
 							logger.debug("Record is new");
-							recordStatus = RECORD_NEW;
+							recordStatus = RecordStatus.RECORD_NEW;
 						}
 						
 						for (IMarcRecordProcessor processor : recordProcessors) {
@@ -692,14 +697,14 @@ public class MarcProcessor {
 						}
 						//logger.info("Adding print title to mysql");
 						// Update the checksum in the database
-						if (recordStatus == RECORD_CHANGED) {
+						if (recordStatus == RecordStatus.RECORD_CHANGED) {
 							updateMarcInfoStmt.setLong(1, marcInfo.getChecksum());
 							updateMarcInfoStmt.setLong(2, marcIndexedInfo.getChecksum());
 							updateMarcInfoStmt.setInt(3, marcInfo.isEContent() ? 1 : 0);
 							updateMarcInfoStmt.setInt(4, marcIndexedInfo.isEContent() ? 1 : 0);
 							updateMarcInfoStmt.setString(5, marcInfo.getId());
 							updateMarcInfoStmt.executeUpdate();
-						} else if (recordStatus == RECORD_NEW) {
+						} else if (recordStatus == RecordStatus.RECORD_NEW) {
 							insertMarcInfoStmt.setString(1, marcInfo.getId());
 							insertMarcInfoStmt.setLong(2, marcInfo.getChecksum());
 							insertMarcInfoStmt.setInt(3, marcInfo.isEContent() ? 1 : 0);

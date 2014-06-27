@@ -96,14 +96,17 @@ public class MarcIndexer implements IMarcRecordProcessor, IRecordProcessor {
 	}
 
 	@Override
-	public boolean processMarcRecord(MarcProcessor processor, MarcRecordDetails recordInfo, int recordStatus, Logger logger) {
+	public boolean processMarcRecord(MarcProcessor processor, MarcRecordDetails recordInfo, MarcProcessor.RecordStatus recordStatus, Logger logger) {
 		try {
 			results.incRecordsProcessed();
-			if (recordStatus == MarcProcessor.RECORD_UNCHANGED && !reindexUnchangedRecords){
+			if (recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED && !reindexUnchangedRecords){
 				//logger.info("Skipping record because it hasn't changed");
 				results.incSkipped();
 				return true;
-			}
+			} else if(recordStatus == MarcProcessor.RecordStatus.RECORD_DELETED) {
+                updateServer.deleteById(recordInfo.getId());
+                return true;
+            }
 			
 			
 			if (!recordInfo.isEContent()){

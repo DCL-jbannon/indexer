@@ -302,12 +302,12 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public boolean processMarcRecord(MarcProcessor processor, MarcRecordDetails recordInfo, int recordStatus, Logger logger) {
+	public boolean processMarcRecord(MarcProcessor processor, MarcRecordDetails recordInfo, MarcProcessor.RecordStatus recordStatus, Logger logger) {
 		Long resourceId = -1L;
 		
 		boolean updateSubjectAndCallNumber = true;
 		results.incRecordsProcessed();
-		
+
 		if (recordInfo.isEContent()){
 			results.incSkipped();
 			logger.debug("Skipping updating resource for record because it is eContent");
@@ -317,7 +317,7 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 			}
 			return true;
 		}
-		if (recordStatus == MarcProcessor.RECORD_UNCHANGED && !updateUnchangedResources){
+		if (recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED && !updateUnchangedResources){
 			boolean updateResource = false; 
 			BasicResourceInfo basicResourceInfo = existingResources.get(recordInfo.getId());
 			if (basicResourceInfo != null && basicResourceInfo.getResourceId() != null ){
@@ -342,7 +342,11 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 				resourceId = basicResourceInfo.getResourceId();
 				//Remove the resource from the existingResourcesList so 
 				//We can determine which resources no longer exist
-				existingResources.remove(recordInfo.getId());
+
+                if(recordStatus == MarcProcessor.RecordStatus.RECORD_DELETED) {
+                    existingResources.remove(recordInfo.getId());
+                }
+
 				if (updateUnchangedResources || basicResourceInfo.getMarcChecksum() == null || (basicResourceInfo.getMarcChecksum() != recordInfo.getChecksum())){
 					// Update the existing record
 					String title = recordInfo.getTitle();

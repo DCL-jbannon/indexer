@@ -166,9 +166,14 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 	}
 
 	@Override
-	public boolean processMarcRecord(MarcProcessor processor, MarcRecordDetails recordInfo, int recordStatus, Logger logger) {
+	public boolean processMarcRecord(MarcProcessor processor, MarcRecordDetails recordInfo, MarcProcessor.RecordStatus recordStatus, Logger logger) {
 		try {
 			results.incRecordsProcessed();
+
+            if(recordStatus == MarcProcessor.RecordStatus.RECORD_DELETED) {
+                return true;
+            }
+
 			// Write the id
 			writer.write("'" + recordInfo.getId() + "'");
 			// Write a link to the title

@@ -45,7 +45,9 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 	private PreparedStatement doesIlsIdExist;
 	private PreparedStatement createEContentRecord;
 	private PreparedStatement updateEContentRecord;
+    private PreparedStatement deleteEContentRecord;
 	private PreparedStatement deleteEContentItem;
+    private PreparedStatement deleteEContentItemForRecord;
 	private PreparedStatement doesGutenbergItemExist;
 	private PreparedStatement addGutenbergItem;
 	private PreparedStatement updateGutenbergItem;
@@ -90,8 +92,10 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 			doesIlsIdExist = econtentConn.prepareStatement("SELECT id from econtent_record WHERE ilsId = ?");
 			createEContentRecord = econtentConn.prepareStatement("INSERT INTO econtent_record (ilsId, cover, source, title, subTitle, author, author2, description, contents, subject, language, publisher, edition, isbn, issn, upc, lccn, topic, genre, region, era, target_audience, sourceUrl, purchaseUrl, publishDate, marcControlField, accessType, date_added, marcRecord) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", PreparedStatement.RETURN_GENERATED_KEYS);
 			updateEContentRecord = econtentConn.prepareStatement("UPDATE econtent_record SET ilsId = ?, source = ?, title = ?, subTitle = ?, author = ?, author2 = ?, description = ?, contents = ?, subject = ?, language = ?, publisher = ?, edition = ?, isbn = ?, issn = ?, upc = ?, lccn = ?, topic = ?, genre = ?, region = ?, era = ?, target_audience = ?, sourceUrl = ?, purchaseUrl = ?, publishDate = ?, marcControlField = ?, accessType = ?, date_updated = ?, marcRecord = ? WHERE id = ?");
+            deleteEContentRecord = econtentConn.prepareStatement("DELETE FROM econtent_record WHERE ilsId = ?");
 			deleteEContentItem = econtentConn.prepareStatement("DELETE FROM econtent_item where id = ?");
-			
+            deleteEContentItemForRecord = econtentConn.prepareStatement("DELETE ei.* FROM dclecontent_prod.econtent_item ei, dclecontent_prod.econtent_record er WHERE er.ilsId = ? AND er.id = ei.recordId");
+
 			doesGutenbergItemExist = econtentConn.prepareStatement("SELECT id from econtent_item WHERE recordId = ? AND item_type = ? and notes = ?");
 			addGutenbergItem = econtentConn.prepareStatement("INSERT INTO econtent_item (recordId, item_type, filename, folder, link, notes, date_added, addedBy, date_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 			updateGutenbergItem = econtentConn.prepareStatement("UPDATE econtent_item SET filename = ?, folder = ?, link = ?, date_updated =? WHERE recordId = ? AND item_type = ? AND notes = ?");
@@ -115,9 +119,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 	}
 	
 	@Override
-	public boolean processMarcRecord(MarcProcessor marcProcessor, MarcRecordDetails recordInfo, int recordStatus, Logger logger) {
-		
-		
+	public boolean processMarcRecord(MarcProcessor marcProcessor, MarcRecordDetails recordInfo, MarcProcessor.RecordStatus recordStatus, Logger logger) {
 		try {
 			//Check the 856 tag to see if this is a source that we can handle. 
 			results.incRecordsProcessed();
@@ -127,16 +129,29 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 				return false;
 			}
 
-			String ilsIdToActiveEcontent = recordInfo.getId();
-			ActiveEcontentUtils.addActiveEcontent(ilsIdToActiveEcontent);
-			
-			if(recordStatus == MarcProcessor.RECORD_UNCHANGED)
+            String ilsId = recordInfo.getId();
+			ActiveEcontentUtils.addActiveEcontent(ilsId);
+
+            if (ilsId.length() == 0){
+                //Get the ils id
+                ilsId = recordInfo.getId();
+            }
+
+			if(recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED)
 			{
 				logger.info("Skipping eContent record because has not changed. Size Active Records: " + ActiveEcontentUtils.getList().size());
 				return false;
-			}
-			
-			logger.debug("Record is eContent, processing");
+			} else if (recordStatus == MarcProcessor.RecordStatus.RECORD_DELETED) {
+                deleteEContentItemForRecord.setString(1, ilsId);
+                deleteEContentItemForRecord.executeUpdate();
+
+                deleteEContentRecord.setString(1, ilsId);
+                deleteEContentRecord.executeUpdate();
+
+                return true;
+            }
+
+            logger.debug("Record is eContent, processing");
 			//Record is eContent, get additional details about how to process it.
 			HashMap<String, DetectionSettings> detectionSettingsBySource = recordInfo.getEContentDetectionSettings();
 			if (detectionSettingsBySource == null || detectionSettingsBySource.size() == 0){
@@ -155,7 +170,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 				if (source.equalsIgnoreCase("overdrive") && checkOverDriveAvailability){
 					//Overdrive record, force processing to make sure we get updated availability
 					logger.debug("Record is overdrive, forcing reindex to check overdrive availability");
-				}else if (recordStatus == MarcProcessor.RECORD_UNCHANGED){
+				}else if (recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED){
 					if (reindexUnchangedRecords){
 						logger.debug("Record is unchanged, but reindex unchanged records is on");
 					}else{
@@ -169,11 +184,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 				
 				
 				//Check to see if the record already exists
-				String ilsId = recordInfo.getId();
-				if (ilsId.length() == 0){
-					//Get the ils id
-					ilsId = recordInfo.getId();
-				}
+
 				boolean importRecordIntoDatabase = true;
 				long eContentRecordId = -1;
 				if (ilsId.length() == 0){
@@ -207,7 +218,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 				
 				
 				logger.info("ADDING/UPDATING ECONTENT: " + recordStatus + " " +ilsId);
-				if (importRecordIntoDatabase){
+                if (importRecordIntoDatabase){
 					//Add to database
 					//logger.info("Adding ils id " + ilsId + " to the database.");
 					createEContentRecord.setString(1, recordInfo.getId());
