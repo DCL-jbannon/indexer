@@ -25,7 +25,6 @@ import javax.xml.parsers.FactoryConfigurationError;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.TransformerException;
 
-import org.apache.log4j.Logger;
 import org.apache.solr.common.SolrInputDocument;
 import org.econtent.DetectionSettings;
 import org.econtent.LibrarySpecificLink;
@@ -37,6 +36,8 @@ import org.marc4j.marc.DataField;
 import org.marc4j.marc.Record;
 import org.marc4j.marc.Subfield;
 import org.marc4j.marc.VariableField;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.solrmarc.tools.CallNumUtils;
 import org.solrmarc.tools.SolrMarcIndexerException;
 import org.solrmarc.tools.Utils;
@@ -50,8 +51,9 @@ import bsh.Primitive;
 import bsh.UtilEvalError;
 
 public class MarcRecordDetails {
+    final static Logger logger = LoggerFactory.getLogger(MarcProcessor.class);
+
 	private MarcProcessor										marcProcessor;
-	private Logger													logger;
 
 	private Record													record;
 	private HashMap<String, Object>					mappedFields		= new HashMap<String, Object>();
@@ -68,13 +70,11 @@ public class MarcRecordDetails {
 	 * 
 	 * @param marcProcessor
 	 * @param record
-	 * @param logger
 	 * @return
 	 */
-	public MarcRecordDetails(MarcProcessor marcProcessor, Record record, Logger logger) {
+	public MarcRecordDetails(MarcProcessor marcProcessor, Record record) {
 		// Preload basic information that nearly everything will need
 		this.record = record;
-		this.logger = logger;
 		this.marcProcessor = marcProcessor;
 
 		// Map the id field
@@ -816,7 +816,7 @@ public class MarcRecordDetails {
 			result = out.toString("UTF-8");
 		} catch (UnsupportedEncodingException e) {
 			// e.printStackTrace();
-			logger.error(e.getCause());
+            logger.error("Could not get toString() byteArray for RawMarc", e);
 		}
 		return result;
 	}
@@ -840,7 +840,7 @@ public class MarcRecordDetails {
 			result = out.toString("UTF-8");
 		} catch (UnsupportedEncodingException e) {
 			// e.printStackTrace();
-			logger.error(e.getCause());
+            logger.error("Could not get toString() byteArray for Marc", e);
 		}
 		return result;
 	}
@@ -865,7 +865,7 @@ public class MarcRecordDetails {
 			tmp = out.toString("UTF-8");
 		} catch (UnsupportedEncodingException e) {
 			// e.printStackTrace();
-			logger.error(e.getCause());
+			logger.error("Could not get toString() byteArray for XML", e);
 		}
 		return tmp;
 	}

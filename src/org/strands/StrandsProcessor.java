@@ -11,55 +11,43 @@ import java.nio.charset.CodingErrorAction;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.regex.Pattern;
 
-import org.apache.log4j.Logger;
-import org.ini4j.Ini;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.vufind.MarcRecordDetails;
 import org.vufind.IEContentProcessor;
 import org.vufind.IMarcRecordProcessor;
 import org.vufind.IRecordProcessor;
 import org.vufind.MarcProcessor;
-import org.vufind.ProcessorResults;
 import org.vufind.Util;
+import org.vufind.config.Config;
 
 public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcessor, IRecordProcessor {
-	private Logger logger;
-	private BufferedWriter writer;
-	private String vufindUrl;
-	private String bookcoverUrl;
+    final static Logger logger = LoggerFactory.getLogger(StrandsProcessor.class);
+
+    private Config config = null;
+
+    private File tempFile = null;
+    private BufferedWriter writer;
+
 	private PreparedStatement getFormatsForRecord = null;
-	private File tempFile;
-	private String strandsCatalogFile;
-	private ProcessorResults results;
+
 	
 	/**
 	 * Build a csv file to import into strands
 	 */
-	public boolean init(Ini configIni, String serverName, long reindexLogId, Connection vufindConn, Connection econtentConn, Logger logger) {
-		this.logger = logger;
-		results = new ProcessorResults("Strands Export", reindexLogId, vufindConn, logger);
+	public boolean init(Config config) {
 		logger.info("Creating Catalog File for Strands");
 
-		vufindUrl = configIni.get("Site", "url");
-		if (vufindUrl == null || vufindUrl.length() == 0) {
-			logger.error("VuFind URL not found in General Settings.  Please specify the url to vufind as the vufindUrl key");
-			return false;
-		}
-		bookcoverUrl = configIni.get("Site", "coverUrl");
-		if (bookcoverUrl == null || bookcoverUrl.length() == 0) {
-			logger.error("Bookcover URL not found in General Settings.  Please specify the url to the bookcover server as the bookcoverUrl key");
-			return false;
-		}
-		
-		// Get the destination name where the catalog should be written to.
-		strandsCatalogFile = configIni.get("Reindex", "strandsCatalogFile");
-		if (strandsCatalogFile == null || strandsCatalogFile.length() == 0) {
-			logger.error("Output File not found in GenerateCatalog Settings.  Please specify the path as the outputFile key.");
-			return false;
-		}
-		
-		//Connect to the eContent database
+        Connection econtentConn = null;
+        try {
+            econtentConn = config.getEcontentDatasource().getConnection();
+        } catch (SQLException e) {
+            logger.error("Couldn't get connection in StrandsProcessor", e);
+        }
+        //Connect to the eContent database
 		try {
 			//Connect to the vufind database
 			getFormatsForRecord = econtentConn.prepareStatement("SELECT distinct item_type from econtent_item where recordId = ?");
@@ -94,15 +82,14 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 			Pattern.CANON_EQ);
 
 	@Override
-	public boolean processEContentRecord(ResultSet eContentRecord) {
+	public boolean processEContentRecord(String indexName, ResultSet eContentRecord) {
 		try {
-			results.incEContentRecordsProcessed();
 			// Write the id
 			String id = eContentRecord.getString("id");
 			logger.info("Processing eContentRecord " + id);
 			writer.write("'econtentRecord" + id + "'");
 			// Write a link to the title
-			writer.write("|'" + vufindUrl + "/EContentRecord/" + id + "'");
+			writer.write("|'" + config.getVufindUrl() + "/EContentRecord/" + id + "'");
 			writer.write("|'" + Util.prepForCsv(eContentRecord.getString("title"), true, false) + "'");
 			StringBuffer authors = new StringBuffer();
 			authors.append(Util.prepForCsv(eContentRecord.getString("author"), true, false));
@@ -118,7 +105,7 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 			// Get the image link
 			String isbn = eContentRecord.getString("isbn");
 			String upc = eContentRecord.getString("upc");
-			writer.write("|'" + bookcoverUrl + "/bookcover.php?isn=" + isbn + "&upc=" + upc + "&id=econtentRecord" + id + "&size=small&econtent=true'");
+			writer.write("|'" + config.getStrandsBookcoverUrl() + "/bookcover.php?isn=" + isbn + "&upc=" + upc + "&id=econtentRecord" + id + "&size=small&econtent=true'");
 
 			// Get the publisher
 			String publisher = eContentRecord.getString("publisher");
@@ -154,12 +141,9 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 			writer.write("|'EMedia'");
 
 			writer.write("\r\n");
-			results.incAdded();
 			
 			return true;
 		} catch (Exception e) {
-			results.incErrors();
-			results.addNote("Error processing eContent record " + e.toString());
 			logger.error("Error processing eContent record", e);
 			return false;
 		}
@@ -168,7 +152,6 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 	@Override
 	public boolean processMarcRecord(MarcProcessor processor, MarcRecordDetails recordInfo, MarcProcessor.RecordStatus recordStatus, Logger logger) {
 		try {
-			results.incRecordsProcessed();
 
             if(recordStatus == MarcProcessor.RecordStatus.RECORD_DELETED) {
                 return true;
@@ -177,7 +160,7 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 			// Write the id
 			writer.write("'" + recordInfo.getId() + "'");
 			// Write a link to the title
-			writer.write("|'" + vufindUrl + "/Record/" + recordInfo.getId() + "'");
+			writer.write("|'" + config.getVufindUrl() + "/Record/" + recordInfo.getId() + "'");
 			writer.write("|'" + Util.prepForCsv(recordInfo.getTitle(), true, false) + "'");
 			StringBuffer authors = new StringBuffer();
 			for (String author : recordInfo.getAuthors()) {
@@ -189,7 +172,7 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 			writer.write("|'" + authors.toString() + "'");
 
 			// Get the image link
-			writer.write("|'" + bookcoverUrl + "/bookcover.php?isn=" + recordInfo.getIsbn() + "&upc=" + recordInfo.getFirstFieldValueInSet("upc") + "&id="
+			writer.write("|'" + config.getStrandsBookcoverUrl() + "/bookcover.php?isn=" + recordInfo.getIsbn() + "&upc=" + recordInfo.getFirstFieldValueInSet("upc") + "&id="
 					+ recordInfo.getId() + "&amp;size=small'");
 
 			// Get the publisher
@@ -219,12 +202,10 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 			writer.write("|'" + categories.toString() + "'");
 
 			writer.write("\r\n");
-			results.incAdded();
 			
 			return true;
 		} catch (IOException e) {
 			logger.error("Error writing to catalog file, " + e.toString());
-			results.addNote("Error writing to catalog file, " + e.toString());
 			return false;
 		}
 	}
@@ -237,23 +218,18 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 
 			// Copy the temp file to the correct location so it can be picked up by
 			// strands
-			File outputFile = new File(strandsCatalogFile);
+			File outputFile = new File(config.getStrandsCatalogFile());
 			if (outputFile.exists()) {
 				outputFile.delete();
 			}
 			if (!tempFile.renameTo(outputFile)) {
 				logger.error("Could not copy the temp file to the final output file.");
 			} else {
-				logger.info("Output file has been created as " + strandsCatalogFile);
+				logger.info("Output file has been created as " + config.getStrandsCatalogFile());
 			}
 			
 		} catch (IOException e) {
-			results.addNote("Error saving strands catalog " + e.toString());
 			logger.error("Error saving strands catalog", e);
 		}
-	}
-	@Override
-	public ProcessorResults getResults() {
-		return results;
 	}
 }

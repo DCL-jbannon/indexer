@@ -10,13 +10,17 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
 import org.ini4j.Ini;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.solrmarc.tools.Utils;
+import org.vufind.config.Config;
 
 public class UpdateResourceInformation implements IMarcRecordProcessor, IEContentProcessor, IRecordProcessor{
-	private Logger logger;
-	
+    final static Logger logger = LoggerFactory.getLogger(UpdateResourceInformation.class);
+
+    Config config = null;
+
 	private boolean updateUnchangedResources = false;
 	private boolean removeTitlesNotInMarcExport = false;
 	
@@ -44,15 +48,8 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 	private PreparedStatement clearResourceCallnumbersStmt = null;
 	private PreparedStatement addCallnumberToResourceStmt = null;
 	
-	//Information about how to process call numbers for local browse
-	private String itemTag;
-	private String callNumberSubfield;
-	private String locationSubfield;
-	
 	//A list of existing resources so we can mark records as deleted if they no longer exist
 	private HashMap<String, BasicResourceInfo> existingResources = new HashMap<String, BasicResourceInfo>();
-	
-	private ProcessorResults results;
 
     private PreparedStatement getDuplicateRecordIdsStmt;
 
@@ -74,33 +71,17 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 
     private PreparedStatement transferUserResourceStmt;
 	
-	public boolean init(Ini configIni, String serverName, long reindexLogId, Connection vufindConn, Connection econtentConn, Logger logger) {
-		this.logger = logger;
-		results = new ProcessorResults("Update Resources", reindexLogId, vufindConn, logger);
+	public boolean init(Config config) {
 		// Load configuration
-		String databaseConnectionInfo = Util.cleanIniValue(configIni.get("Database", "database_vufind_jdbc"));
-		if (databaseConnectionInfo == null || databaseConnectionInfo.length() == 0) {
-			logger.error("Database connection information not found in General Settings.  Please specify connection information in a database key.");
-			return false;
-		}
-		
-		String vufindUrl = configIni.get("Site", "url");
-		if (vufindUrl == null || vufindUrl.length() == 0) {
-			logger.error("Unable to get URL for VuFind in General settings.  Please add a vufindUrl key.");
-		}
-		
-		String updateUnchangedResourcesVal = configIni.get("Reindex", "updateUnchangedResources");
-		if (updateUnchangedResourcesVal != null && updateUnchangedResourcesVal.length() > 0){
-			updateUnchangedResources = Boolean.parseBoolean(updateUnchangedResourcesVal);
-		}
-		
-		String removeTitlesNotInMarcExportVal = configIni.get("Reindex", "removeTitlesNotInMarcExport");
-		if (removeTitlesNotInMarcExportVal != null && removeTitlesNotInMarcExportVal.length() > 0){
-			removeTitlesNotInMarcExport = Boolean.parseBoolean(removeTitlesNotInMarcExportVal);
-		}
-		
-		
-		try {
+        this.config = config;
+        Connection vufindConn = null;
+        try {
+            vufindConn = config.getVufindDatasource().getConnection();
+        } catch (SQLException e) {
+            logger.error("Couldn't get connection in UpdateResourceInformatino", e);
+        }
+
+        try {
 			// Setup prepared statements
 			resourceUpdateStmt = vufindConn.prepareStatement("UPDATE resource SET title = ?, title_sort = ?, author = ?, isbn = ?, upc = ?, format = ?, format_category = ?, marc_checksum=?, marc = ?, shortId = ?, date_updated=?, deleted=0 WHERE id = ?");
 			resourceUpdateStmtNoMarc = vufindConn.prepareStatement("UPDATE resource SET title = ?, title_sort = ?, author = ?, isbn = ?, upc = ?, format = ?, format_category = ?, marc_checksum=?, shortId = ?, date_updated=?, deleted=0 WHERE id = ?");
@@ -136,11 +117,7 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
             existingResourceStmt = vufindConn.prepareStatement("SELECT id, date_updated FROM resource WHERE record_id = ? AND source = 'eContent'");
 			addResourceStmt = vufindConn.prepareStatement("INSERT INTO resource (record_id, title, source, author, title_sort, isbn, upc, format, format_category, marc_checksum, date_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 			updateResourceStmt = vufindConn.prepareStatement("UPDATE resource SET record_id = ?, title = ?, source = ?, author = ?, title_sort = ?, isbn = ?, upc = ?, format = ?, format_category = ?, marc_checksum = ?, date_updated = ? WHERE id = ?");
-			
-			//Load field information for local call numbers
-			itemTag = configIni.get("Reindex", "itemTag");
-			callNumberSubfield = configIni.get("Reindex", "callNumberSubfield");
-			locationSubfield = configIni.get("Reindex", "locationSubfield");
+
 			
 			//Cleanup duplicate resources
             getDuplicateRecordIdsStmt = vufindConn.prepareStatement(
@@ -167,8 +144,6 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 			
 			//Get a list of resources that have already been installed. 
 			logger.debug("Loading existing resources");
-			results.addNote("Loading existing resources");
-			results.saveResults();
             PreparedStatement existingResourceStmt = vufindConn.prepareStatement("SELECT record_id, id, marc_checksum, deleted FROM resource WHERE source = 'VuFind'", ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 			ResultSet existingResourceRS = existingResourceStmt.executeQuery();
 			while (existingResourceRS.next()){
@@ -179,8 +154,6 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 			}
 			existingResourceRS.close();
 			logger.debug("Finished loading existing resources");
-			results.addNote("Finished loading existing resources");
-			results.saveResults();
 			
 		} catch (SQLException ex) {
 			// handle any errors
@@ -213,8 +186,6 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
     private void cleanupDuplicateResources() {
 		try {
 			logger.info("Cleaning up resources table");
-			results.addNote("Cleaning up resources table");
-			results.saveResults();
 			
 			//Get a list of the total number of resources 
             //Can return multiple copies and also return the "correct" record in edge cases, so be careful
@@ -242,9 +213,6 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 			
 		} catch (Exception e) {
 			logger.error("Error cleaning up duplicate resources", e);
-			results.addNote("Cleaning up duplicate resources");
-			results.incErrors();
-			results.saveResults();
 		}
 		logger.debug("Cleaning up resources");
 	}
@@ -260,7 +228,6 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
             deleteResourceCallNumberPermanentStmt.executeUpdate();
             deleteResourceSubjectPermanentStmt.setString(1, resourceId);
             deleteResourceSubjectPermanentStmt.executeUpdate();
-			results.incDeleted();
 		} catch (SQLException e) {
             logger.error("Error deleting resource permanently " + resourceId, e);
 		}
@@ -293,8 +260,7 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
             transferUserResourceStmt.setString(2, idToTransferFrom);
 			int numUserResourceMoved = transferUserResourceStmt.executeUpdate();
 			if (numUserResourceMoved > 0) logger.info("Moved " + numUserResourceMoved + " user resource (list) entries");
-			
-			results.incUpdated();
+
 		} catch (SQLException e) {
 			logger.error("Error transferring resource info for user from " + idToTransferFrom + " to " + idToTransferTo, e);
 		}
@@ -306,10 +272,8 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 		Long resourceId = -1L;
 		
 		boolean updateSubjectAndCallNumber = true;
-		results.incRecordsProcessed();
 
 		if (recordInfo.isEContent()){
-			results.incSkipped();
 			logger.debug("Skipping updating resource for record because it is eContent");
 			BasicResourceInfo basicResourceInfo = existingResources.get(recordInfo.getId());
 			if (basicResourceInfo != null && basicResourceInfo.getResourceId() != null ){
@@ -330,7 +294,6 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 			}
 			if (!updateResource){
 				logger.debug("Skipping record because it hasn't changed");
-				results.incSkipped();
 				return true;
 			}
 		}
@@ -357,7 +320,6 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 					int rowsUpdated = 0;
 					if (marcString == null || marcString.length() == 0) {
 						logger.error("MarcRecordDetails.getRawRecord() returned NULL or empty for record " + recordInfo.getId());
-						results.addNote("MarcRecordDetails.getRawRecord() returned NULL or empty for record " + recordInfo.getId());
 						resourceUpdateStmtNoMarc.setString(1, Util.trimTo(200, title));
 						resourceUpdateStmtNoMarc.setString(2, Util.trimTo(200, recordInfo.getSortTitle()));
 						resourceUpdateStmtNoMarc.setString(3, Util.trimTo(255, author));
@@ -387,13 +349,10 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 					}
 					if (rowsUpdated == 0) {
 						logger.debug("Unable to update resource for record " + recordInfo.getId() + " " + resourceId);
-						results.incErrors();
 					}else{
-						results.incUpdated();
 					}
 				}else{
 					updateSubjectAndCallNumber = false;
-					results.incSkipped();
 				}
 				
 
@@ -417,9 +376,7 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 				int rowsUpdated = resourceInsertStmt.executeUpdate();
 				if (rowsUpdated == 0) {
 					logger.debug("Unable to insert record " + recordInfo.getId());
-					results.incErrors();
 				} else {
-					results.incAdded();
 					//Get the resourceId
 					ResultSet insertedResourceIds = resourceInsertStmt.getGeneratedKeys();
 					if (insertedResourceIds.next()){
@@ -467,8 +424,12 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 						}
 					}
 				}
-				
-				if (callNumberSubfield != null && callNumberSubfield.length() > 0 && locationSubfield != null && locationSubfield.length() > 0){
+
+                String callNumberSubfield = config.getCallNumberSubfield();
+                String locationSubfield = config.getLocationSubfield();
+                String itemTag = config.getItemTag();
+
+                if (callNumberSubfield!= null && callNumberSubfield.length() > 0 && locationSubfield != null && locationSubfield.length() > 0){
 					//Add call numbers based on the location
 					Set<LocalCallNumber> localCallNumbers = recordInfo.getLocalCallNumbers(itemTag, callNumberSubfield, locationSubfield);
 					for (LocalCallNumber curCallNumber : localCallNumbers){
@@ -485,13 +446,8 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 		} catch (SQLException ex) {
 			// handle any errors
 			logger.error("Error updating resource for record " + recordInfo.getId() + " " + recordInfo.getTitle(), ex);
-			//System.out.println("Error updating resource for record " + recordInfo.getId() + " " + recordInfo.getTitle() + " " + ex.toString());
-			results.addNote("Error updating resource for record " + recordInfo.getId() + " " + recordInfo.getTitle() + " " + ex.toString());
-			results.incErrors();
 		}finally{
-			if (results.getRecordsProcessed() % 100 == 0){
-				results.saveResults();
-			}
+
 		}
 		logger.debug("Finished updating resource");
 		return true;
@@ -500,8 +456,6 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 	@Override
 	public void finish() {
 		if (removeTitlesNotInMarcExport){
-			results.addNote("Deleting resources that no longer exist from resources table, there are " + existingResources.size() + " resources to be deleted.");
-			results.saveResults();
 			
 			//Mark any resources that no longer exist as deleted.
 			int numResourcesToDelete = 0;
@@ -525,10 +479,6 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 						logger.error("Unable to delete resources", e);
 						break;
 					}
-					results.incDeleted();
-					if (results.getNumDeleted() % 1000 == 0){
-						results.saveResults();
-					}
 				}
 			}
 			if (numResourcesAdded > 0 && numResourcesAdded == maxResourcesToDelete){
@@ -544,20 +494,13 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 					logger.error("Unable to delete final resources", e);
 				}
 			}
-			results.addNote("Finished deleting resources");
-			results.saveResults();
 		}
 	}
 
-	@Override
-	public ProcessorResults getResults() {
-		return results;
-	}
 
 	@Override
-	public boolean processEContentRecord(ResultSet allEContent) {
+	public boolean processEContentRecord(String indexName, ResultSet allEContent) {
 		try {
-			results.incEContentRecordsProcessed();
 			String econtentId = allEContent.getString("id");
 			
 			//Load title information so we have access regardless of 
@@ -622,14 +565,10 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 					int numUpdated = updateResourceStmt.executeUpdate();
 					if (numUpdated != 1){
 						logger.error("Resource not updated for econtent record " + econtentId);
-						results.incErrors();
-						results.addNote("Resource not updated for econtent record " + econtentId);
 					}else{
-						results.incUpdated();
 					}
 				}else{
 					logger.debug("Not updating resource for eContentRecord " + econtentId + ", it is already up to date");
-					results.incSkipped();
 				}
 			}else{
 				//Insert a new resource
@@ -648,22 +587,15 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 				int numAdded = addResourceStmt.executeUpdate();
 				if (numAdded != 1){
 					logger.error("Resource not added for econtent record " + econtentId);
-					results.incErrors();
-					results.addNote("Resource not added for econtent record");
 				}else{
-					results.incAdded();
 				}
 			}
 			return true;
 		} catch (SQLException e) {
 			logger.error("Error updating resources for eContent", e);
-			results.incErrors();
-			results.addNote("Error updating resources for eContent " + e.toString());
 			return false;
 		}finally{
-			if (results.getEContentRecordsProcessed() % 100 == 0){
-				results.saveResults();
-			}
+
 		}
 	}
 }

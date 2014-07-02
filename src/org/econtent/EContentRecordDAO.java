@@ -7,44 +7,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
+import org.apache.commons.dbcp2.BasicDataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Data access object for the EContentRecord.
  */
 public class EContentRecordDAO {
+    final static Logger logger = LoggerFactory.getLogger(EContentRecordDAO.class);
     private static EContentRecordDAO instance = null;
 
-    private Logger logger = null;
-	private Connection connection = null;
-    private PreparedStatement insertEcontentItemPS = null;
+	private BasicDataSource dataSource = null;
+    private Connection connection = null;
 
 	private final Map<Long, Double> ratingsCache;
 	private final Map<Long, List<String>> itemTypesCache;
 
-	private EContentRecordDAO() {
-		ratingsCache = new HashMap<Long, Double>();
-		itemTypesCache = new HashMap<Long, List<String>>();
-        logger = Logger.getLogger(EContentRecordDAO.class);
-	}
-
-	/**
-	 * Setup this class before it can be used. Should be called only once.
-	 *
-	 * @param connection
-	 */
-	public static void initialize(Connection connection) throws SQLException {
-        instance = new EContentRecordDAO();
-        instance.connection = connection;
-	}
-
-	/**
-	 * Get an instance of this class.
-	 * 
-	 * @return
-	 */
-	public static EContentRecordDAO getInstance() {
-		return instance;
+	public EContentRecordDAO(BasicDataSource dataSource) {
+        this.ratingsCache = new HashMap<Long, Double>();
+        this.itemTypesCache = new HashMap<Long, List<String>>();
+        this.dataSource = dataSource;
 	}
 
 	/**
@@ -71,6 +54,7 @@ public class EContentRecordDAO {
 		return itemTypesCache.get(Long.valueOf(recordId));
 	}
 
+    private PreparedStatement deleteEcontentRecord = null;
 	/**
 	 * Delete an eContent record and associated items.
 	 * 
@@ -79,13 +63,13 @@ public class EContentRecordDAO {
 	 */
 	public void delete(long id) throws SQLException {
 		deleteItems(id);
-		PreparedStatement stmt = connection
-				.prepareStatement("DELETE FROM econtent_record WHERE id = ?");
-		stmt.setLong(1, id);
-		stmt.executeUpdate();
-		stmt.close();
+        String query = "DELETE FROM econtent_record WHERE id = ?";
+        this.deleteEcontentRecord = getActivePreparedStatement(this.deleteEcontentRecord, query);
+        this.deleteEcontentRecord.setLong(1, id);
+        this.deleteEcontentRecord.executeUpdate();
 	}
 
+    private PreparedStatement deleteEcontentItems = null;
 	/**
 	 * Delete items associated with the given eContent record.
 	 * 
@@ -93,29 +77,29 @@ public class EContentRecordDAO {
 	 * @throws SQLException
 	 */
 	public void deleteItems(long id) throws SQLException {
-		PreparedStatement stmt = connection
-				.prepareStatement("DELETE FROM econtent_item WHERE recordId = ?");
-		stmt.setLong(1, id);
-		stmt.executeUpdate();
-		stmt.close();
+        String query = "DELETE FROM econtent_item WHERE recordId = ?";
+        this.deleteEcontentItems = getActivePreparedStatement(this.deleteEcontentRecord, query);
+        this.deleteEcontentItems.setLong(1, id);
+        this.deleteEcontentItems.executeUpdate();
 	}
 
+    private PreparedStatement deleteFreegalEcontentItems = null;
     /**
      * DELETEs all Freegal econtent_item since we get everything new with each Freegal update
      * @throws SQLException
      */
     public void deleteFreegalItems() throws SQLException {
-        PreparedStatement stmt = connection
-                .prepareStatement(
-                        "DELETE ei\n" +
-                        "    FROM dclecontent_prod.econtent_item ei, dclecontent_prod.econtent_record er\n" +
-                        "    WHERE\n" +
-                        "    er.id = ei.recordId\n" +
-                        "    AND er.source = 'Freegal'");
-        stmt.executeUpdate();
-        stmt.close();
+        String query =
+                "DELETE ei\n" +
+                "    FROM dclecontent_prod.econtent_item ei, dclecontent_prod.econtent_record er\n" +
+                "    WHERE\n" +
+                "    er.id = ei.recordId\n" +
+                "    AND er.source = 'Freegal'";
+        this.deleteFreegalEcontentItems = getActivePreparedStatement(this.deleteFreegalEcontentItems, query);
+        this.deleteFreegalEcontentItems.executeUpdate();
     }
 
+    private PreparedStatement getRecordPS = null;
 	/**
 	 * Find a record given its ID.
 	 * 
@@ -124,32 +108,30 @@ public class EContentRecordDAO {
 	 * @throws SQLException
 	 */
 	public EContentRecord find(long id) throws SQLException {
-		EContentRecord record = null;
-		PreparedStatement stmt = connection
-				.prepareStatement("select * from econtent_record where id=?");
-		stmt.setLong(1, id);
-		ResultSet rs = stmt.executeQuery();
-		if (rs.next()) {
-			record = new EContentRecord(rs);
+        EContentRecord record = null;
+        this.getRecordPS = getActivePreparedStatement(this.getRecordPS, "SELECT * FROM econtent_record WHERE id=?");
+        this.getRecordPS.setLong(1, id);
+		ResultSet rs = this.getRecordPS.executeQuery();
+		if (rs.first()) {
+			record = new EContentRecord(this, rs);
 		}
 		rs.close();
-		stmt.close();
 		return record;
 	}
 
     private HashMap<String, EContentRecord> allRecords = null;
 
+    private PreparedStatement getAllFreegalRecordPS = null;
     private HashMap<String, EContentRecord> selectAllFreegalRecordsInDB() throws SQLException {
         if(allRecords==null) {
             allRecords = new HashMap<String, EContentRecord>();
-            PreparedStatement stmt = connection
-                    .prepareStatement("SELECT * FROM econtent_record WHERE source = 'Freegal'");
-            ResultSet rs = stmt.executeQuery();
+            this.getAllFreegalRecordPS = getActivePreparedStatement(this.getAllFreegalRecordPS,
+                    "SELECT * FROM econtent_record WHERE id=?");
+            ResultSet rs = this.getAllFreegalRecordPS.executeQuery();
             while (rs.next()) {
-                allRecords.put( rs.getString("title")+rs.getString("author"), new EContentRecord(rs));
+                allRecords.put( rs.getString("title")+rs.getString("author"), new EContentRecord(this, rs));
             }
             rs.close();
-            stmt.close();
         }
 
         return allRecords;
@@ -181,6 +163,7 @@ public class EContentRecordDAO {
 		return (record.get("id") == null) ? insert(record) : update(record);
 	}
 
+    private PreparedStatement insertRecordPS = null;
 	/**
 	 * Insert the given record.
 	 * 
@@ -201,23 +184,22 @@ public class EContentRecordDAO {
 		String query = "INSERT INTO econtent_record " + "(" + columnList + ") "
 				+ "VALUES " + "(" + paramList + ")";
 		logger.debug(query);
-		PreparedStatement stmt = connection.prepareStatement(query,
-				PreparedStatement.RETURN_GENERATED_KEYS);
+        this.insertRecordPS = getActivePreparedStatement(this.insertRecordPS, query);
 		int index = 1;
 		for (String column : columns) {
-			setEContentRecordParameter(stmt, index++, column, record);
+			setEContentRecordParameter(this.insertRecordPS, index++, column, record);
 		}
-		stmt.executeUpdate();
-		ResultSet generatedKeys = stmt.getGeneratedKeys();
+        this.insertRecordPS.executeUpdate();
+		ResultSet generatedKeys = this.insertRecordPS.getGeneratedKeys();
 		long id = -1;
 		if (generatedKeys.next()) {
 			id = generatedKeys.getLong(1);
 		}
-		stmt.close();
 		record.set("id", id);
 		return id;
 	}
 
+    private PreparedStatement updateRecordPS = null;
 	/**
 	 * Update the given record.
 	 * 
@@ -237,17 +219,46 @@ public class EContentRecordDAO {
 				+ " WHERE id=?";
 
 		logger.debug(query);
-		PreparedStatement stmt = connection.prepareStatement(query);
+        this.updateRecordPS = getActivePreparedStatement(this.updateRecordPS, query);
 		int index = 1;
 		for (String column : columns) {
-			setEContentRecordParameter(stmt, index++, column, record);
+			setEContentRecordParameter(this.updateRecordPS, index++, column, record);
 		}
-		stmt.setLong(index, record.getInteger("id"));
-		int rowsUpdated = stmt.executeUpdate();
-		stmt.close();
+        this.updateRecordPS.setLong(index, record.getInteger("id"));
+		int rowsUpdated = this.updateRecordPS.executeUpdate();
+
 		return rowsUpdated;
 	}
 
+    private Connection getActiveConnection(Connection connection) throws SQLException {
+        try {
+            if(connection == null || connection.isClosed()) {
+                connection = this.dataSource.getConnection();
+            }
+        } catch (SQLException e) {
+            connection = this.dataSource.getConnection();
+        }
+        return connection;
+    }
+
+    private PreparedStatement getActivePreparedStatement(PreparedStatement checkMe, String sqlStr) throws SQLException {
+        connection = getActiveConnection(connection);
+        PreparedStatement ret = null;
+        try {
+            if (checkMe == null || checkMe.isClosed() || connection == null || connection.isClosed()) {
+                ret = connection.prepareStatement(sqlStr, PreparedStatement.NO_GENERATED_KEYS);
+            } else {
+                ret = checkMe;
+            }
+        } catch(SQLException e) {
+            //Try again, it's possible for isClosed() to throw a SQLException, and we should try to make sure we can't
+            //continue anyway
+            ret = connection.prepareStatement(sqlStr, PreparedStatement.NO_GENERATED_KEYS);
+        }
+        return checkMe;
+    }
+
+    private PreparedStatement insertEcontentItemPS = null;
 	/**
 	 * Add an item record to an existing eContent record.
 	 * 
@@ -255,12 +266,11 @@ public class EContentRecordDAO {
 	 * @throws SQLException
 	 */
 	public void addEContentItem(EContentItem item) throws SQLException {
-        if(this.insertEcontentItemPS == null || this.insertEcontentItemPS.isClosed()) {
-            String query = "INSERT INTO econtent_item " +
-                    "(recordId, link, item_type, notes, addedBy, date_added, date_updated) " +
-                    "VALUES (?,?,?,?,?,?,?)";
-            this.insertEcontentItemPS = connection.prepareStatement(query, PreparedStatement.NO_GENERATED_KEYS);
-        }
+        String query = "INSERT INTO econtent_item " +
+                "(recordId, link, item_type, notes, addedBy, date_added, date_updated) " +
+                "VALUES (?,?,?,?,?,?,?)";
+        this.insertEcontentItemPS = getActivePreparedStatement(this.insertEcontentItemPS, query);
+
         this.insertEcontentItemPS.setString(1, item.getRecordId());
         this.insertEcontentItemPS.setString(2, item.getLink());
         this.insertEcontentItemPS.setString(3, item.getType());
@@ -299,6 +309,7 @@ public class EContentRecordDAO {
 
     }
 
+    private PreparedStatement flagFreegalAsDelPS = null;
 	/**
 	 * Set all Freegal econtent record status to "deleted".
 	 * 
@@ -306,17 +317,17 @@ public class EContentRecordDAO {
 	 * @throws SQLException
 	 */
 	public int flagAllFreegalRecordsAsDeleted() throws SQLException {
-		PreparedStatement stmt = connection
-				.prepareStatement("update econtent_record set status='deleted' where lower(source)='freegal'");
-		int count = stmt.executeUpdate();
-		stmt.close();
-		return count;
+        String query = "update econtent_record set status='deleted' where lower(source)='freegal'";
+        this.flagFreegalAsDelPS = getActivePreparedStatement(this.flagFreegalAsDelPS, query);
+
+		return this.flagFreegalAsDelPS.executeUpdate();
 	}
 
+    private PreparedStatement selectFlaggedFreegalPS = null;
 	public int deleteFreegalRecordsFlaggedAsDeleted() throws SQLException {
-		PreparedStatement stmt = connection
-				.prepareStatement("select id from econtent_record where status='deleted' and lower(source)='freegal'");
-		ResultSet rs = stmt.executeQuery();
+		String query = "select id from econtent_record where status='deleted' and lower(source)='freegal'";
+        this.selectFlaggedFreegalPS = getActivePreparedStatement(this.selectFlaggedFreegalPS, query);
+		ResultSet rs = this.selectFlaggedFreegalPS.executeQuery();
 		int count = 0;
 		while (rs.next()) {
 			delete(rs.getLong(1));
@@ -363,6 +374,7 @@ public class EContentRecordDAO {
 
 	private void loadRatingsCache() throws SQLException {
 		if (ratingsCache.isEmpty()) {
+            connection = getActiveConnection(connection);
 			// load average rating for all records into a map for quick lookup
 			PreparedStatement stmt = connection
 					.prepareStatement("select recordId,avg(rating) as avgRating from econtent_rating group by recordId");
@@ -378,6 +390,7 @@ public class EContentRecordDAO {
 
 	private void loadItemTypesCache() throws SQLException {
 		if (itemTypesCache.isEmpty()) {
+            connection = getActiveConnection(connection);
 			// load item types for all records into a map for quick lookup
 			PreparedStatement stmt = connection
 					.prepareStatement("select recordId,item_type from econtent_item order by recordId,id");

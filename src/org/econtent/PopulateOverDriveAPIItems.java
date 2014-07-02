@@ -6,30 +6,18 @@ import org.API.OverDrive.IOverDriveAPIServices;
 import org.API.OverDrive.IOverDriveCollectionIterator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
-import org.vufind.ProcessorResults;
 import db.DBeContentRecordServices;
 import db.IDBeContentRecordServices;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class PopulateOverDriveAPIItems
 {
+    final static Logger logger = LoggerFactory.getLogger(PopulateOverDriveAPIItems.class);
 
 	private IOverDriveCollectionIterator overDriveAPICollectionIterator;
 	private IDBeContentRecordServices eContentRecordDAO;
 	private IOverDriveAPIServices overDriveApiServices;
-	ProcessorResults processorResults = null;
-	
-	public PopulateOverDriveAPIItems(IOverDriveCollectionIterator overDriveCollectionIterator,
-			 Connection conn,
-			 IOverDriveAPIServices overDriveApiServices,
-			 ProcessorResults processorResults)
-	{
-		this(
-				overDriveCollectionIterator,
-				new DBeContentRecordServices(conn),
-				overDriveApiServices
-			);
-		this.processorResults = processorResults;
-	}
 	
 	public PopulateOverDriveAPIItems(IOverDriveCollectionIterator overDriveCollectionIterator,
 										 Connection conn, 
@@ -58,14 +46,11 @@ public class PopulateOverDriveAPIItems
 	
 	public void addNote(String note, Boolean onlySystemOut)
 	{
-		if ( (this.processorResults!=null) && !onlySystemOut)
-		{
-			this.processorResults.addNote(note);
-		}
-		if(onlySystemOut && this.processorResults!= null)
-		{
-			System.out.println(note);
-		}
+        if(onlySystemOut) {
+            System.out.println(note);
+        } else {
+            logger.debug(note);
+        }
 	}
 
 	public void execute() throws SQLException 

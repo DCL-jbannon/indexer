@@ -1,36 +1,40 @@
 package org.econtent;
 
 import java.io.IOException;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
 
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.API.Freegal.FreegalAPI;
-import org.apache.log4j.Logger;
-import org.ini4j.Ini;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.vufind.config.Config;
 import org.vufind.IRecordProcessor;
-import org.vufind.ProcessorResults;
 import org.xml.sax.SAXException;
 
 public class FreegalImporter implements IRecordProcessor {
-	private Logger logger;
-	private ProcessorResults results;
-	private String freegalUrl;
-	private String freegalUser;
-	private String freegalPIN;
-	private String freegalAPIkey;
-	private String libraryId;
+    final static Logger logger = LoggerFactory.getLogger(FreegalImporter.class);
+
+	private Config config = null;
+
 	private FreegalAPI freegalAPI;
 	private EContentRecordDAO dao;
 
 	public void importRecords() {
-		logger.info("Importing Freegal API Items");
+        logger.info("Importing Freegal API Items");
+
+        try {
+            dao.flagAllFreegalRecordsAsDeleted();
+        } catch (SQLException e) {
+            logger.error("Error flagging all Freegal records as \"deleted\".", e);
+            return;
+        }
+
 		try {
-			EContentRecordDAO dao = EContentRecordDAO.getInstance();
+			EContentRecordDAO dao = config.getEContentRecordDAO();
 			Collection<String> genres = freegalAPI.getAllGenres();
-			logger.info("Freegal Gender Number: " + genres.size());
+            logger.info("Freegal Gender Number: " + genres.size());
             int songsAdded = 0;
 
             // Remove all existing songs for the album from the
@@ -47,29 +51,18 @@ public class FreegalImporter implements IRecordProcessor {
                 }
 			}
 		} catch (ParserConfigurationException e) {
-			logger.error("Error downloading Freegal contents.", e);
-			results.addNote("Error downloading Freegal contents. "
-					+ e.getMessage());
+            logger.error("Error downloading Freegal contents.", e);
 		} catch (SAXException e) {
-			logger.error("Error downloading Freegal contents.", e);
-			results.addNote("Error downloading Freegal contents. "
-					+ e.getMessage());
+            logger.error("Error downloading Freegal contents.", e);
 		} catch (IOException e) {
-			logger.error("Error downloading Freegal contents.", e);
-			results.addNote("Error downloading Freegal contents. "
-					+ e.getMessage());
+            logger.error("Error downloading Freegal contents.", e);
 		} catch (SQLException e) {
-			logger.error("Error adding/updating Freegal records.", e);
-			results.addNote("Error adding/updating Freegal records. "
-					+ e.getMessage());
-			results.incErrors();
+            logger.error("Error adding/updating Freegal records.", e);
 		}
 	}
 
     private void syncEContentRecordsInDB(Collection<Album> albums) throws SQLException{
         for (Album album : albums) {
-            // increment number of econtent record processed
-            results.incEContentRecordsProcessed();
 
             logger.info("Processing album " + album.getTitle()
                     + " the album has " + album.getSongs().size()
@@ -79,7 +72,7 @@ public class FreegalImporter implements IRecordProcessor {
             boolean added = false;
             if (record == null) {
                 // create new record
-                record = new EContentRecord();
+                record = new EContentRecord(config.getEContentRecordDAO());
                 record.set("date_added",
                         (int) (new Date().getTime() / 100));
                 record.set("addedBy", -1);
@@ -103,12 +96,6 @@ public class FreegalImporter implements IRecordProcessor {
             record.set("collection", album.getCollection());
             record.set("cover", album.getCoverUrl());
             dao.save(record);
-
-            if (added) {
-                results.incAdded();
-            } else {
-                results.incUpdated();
-            }
         }
     }
     private void processAlbumPartition(Collection<Album> albums) throws SQLException {
@@ -142,88 +129,25 @@ public class FreegalImporter implements IRecordProcessor {
         dao.flushEContentItems(false);
     }
 
-	@Override
-	public boolean init(Ini configIni, String serverName, long reindexLogId,
-			Connection vufindConn, Connection econtentConn, Logger logger) {
-		this.logger = logger;
-		results = new ProcessorResults("Import Freegal Content", reindexLogId,
-				vufindConn, logger);
-		if (!loadConfig(configIni)) {
-			logger.error("Error loading Freegal API settings from config.ini.");
-			results.addNote("Error loading Freegal API settings from config.ini.");
-			return false;
-		}
-
-		// Get an instance of EContentRecordDAO class
-		dao = EContentRecordDAO.getInstance();
-
-		// Initialize freegal api
-		freegalAPI = new FreegalAPI(freegalUrl, freegalUser, freegalPIN,
-				freegalAPIkey, libraryId);
-
-		// flag all existing Freegal records as "deleted"
-		try {
-			dao.flagAllFreegalRecordsAsDeleted();
-		} catch (SQLException e) {
-			logger.error("Error flagging all Freegal records as \"deleted\".",
-					e);
-			results.addNote("Error flagging all Freegal records as \"deleted\". "
-					+ e.getMessage());
-			return false;
-		}
-
-		return true;
+	public FreegalImporter() {
 	}
 
-	@Override
+    @Override
+    public boolean init(Config config) {
+        this.config = config;
+
+        this.freegalAPI = new FreegalAPI(config.getFreegalUrl(), config.getFreegalUser(), config.getFreegalPIN(),
+                config.getFreegalAPIkey(), config.getFreegalLibraryId());
+        return true;
+    }
+
+    @Override
 	public void finish() {
 		try {
 			int deleted = dao.deleteFreegalRecordsFlaggedAsDeleted();
-			while (deleted-- > 0) {
-				results.incDeleted();
-			}
 		} catch (SQLException e) {
 			logger.error("Error deleting records flagged as deleted", e);
-			results.addNote("Error deleting records flagged as deleted."
-					+ e.getMessage());
-			results.incErrors();
 		}
-		results.saveResults();
 	}
 
-	@Override
-	public ProcessorResults getResults() {
-		return results;
-	}
-
-	private boolean loadConfig(Ini configIni) {
-		freegalUrl = configIni.get("FreeGal", "freegalUrl");
-		if (freegalUrl == null || freegalUrl.length() == 0) {
-			logger.error("Freegal API URL not found.  Please specify url in freegalUrl key.");
-			return false;
-		}
-
-		freegalUser = configIni.get("FreeGal", "freegalUser");
-		if (freegalUser == null || freegalUser.length() == 0) {
-			logger.error("Freegal User not found.  Please specify the barcode of a patron to use while loading freegal information in the freegalUser key.");
-			return false;
-		}
-
-		freegalPIN = configIni.get("FreeGal", "freegalPIN");
-		if (freegalPIN == null || freegalPIN.length() == 0) {
-			logger.error("Freegal PIN not found in.  Please specify the PIN of a patron to use while loading freegal information in the freegalPIN key.");
-			return false;
-		}
-		freegalAPIkey = configIni.get("FreeGal", "freegalAPIkey");
-		if (freegalAPIkey == null || freegalAPIkey.length() == 0) {
-			logger.error("Freegal API Key not found.  Please specify the API Key for the Freegal webservices in the freegalAPIkey key.");
-			return false;
-		}
-		libraryId = configIni.get("FreeGal", "libraryId");
-		if (libraryId == null || libraryId.length() == 0) {
-			logger.error("Freegal Library Id not found.  Please specify the Library for the Freegal webservices the libraryId key.");
-			return false;
-		}
-		return true;
-	}
 }

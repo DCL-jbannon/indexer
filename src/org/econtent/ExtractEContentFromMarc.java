@@ -12,18 +12,20 @@ import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.log4j.Logger;
 import org.dcl.utils.ActiveEcontentUtils;
 import org.econtent.GutenbergItemInfo;
 import org.ini4j.Ini;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.vufind.MarcRecordDetails;
 import org.vufind.IMarcRecordProcessor;
 import org.vufind.IRecordProcessor;
 import org.vufind.MarcProcessor;
-import org.vufind.ProcessorResults;
 import org.vufind.Util;
 
 import au.com.bytecode.opencsv.CSVReader;
+import org.vufind.config.Config;
+
 /**
  * Run this export to build the file to import into VuFind
  * SELECT econtent_record.id, sourceUrl, item_type, filename, folder INTO OUTFILE 'd:/gutenberg_files.csv' FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"' FROM econtent_record INNER JOIN econtent_item on econtent_record.id = econtent_item.recordId  WHERE source = 'Gutenberg';
@@ -32,8 +34,11 @@ import au.com.bytecode.opencsv.CSVReader;
  *
  */
 
-public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordProcessor{
-	private Logger logger;
+public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordProcessor {
+    final static Logger logger = LoggerFactory.getLogger(ExtractEContentFromMarc.class);
+
+    private Config config = null;
+
 	private boolean reindexUnchangedRecords;
 	private boolean checkOverDriveAvailability;
 	private String econtentDBConnectionInfo;
@@ -60,34 +65,23 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 	private PreparedStatement addOverDriveId;
 	private PreparedStatement updateOverDriveId;
 	private PreparedStatement createActiveEContentRecord;
+	;
 	
-	public ProcessorResults results;
-	
-	public boolean init(Ini configIni, String serverName, long reindexLogId, Connection vufindConn, Connection econtentConn, Logger logger) {
-		this.logger = logger;
-		//Import a marc record into the eContent core. 
-		if (!loadConfig(configIni, logger)){
-			return false;
-		}
-		results = new ProcessorResults("Extract eContent from ILS", reindexLogId, vufindConn, logger);
-		
-		String reindexUnchangedRecordsVal = configIni.get("Reindex", "reindexUnchangedRecords");
-		if (reindexUnchangedRecordsVal == null){
-			logger.debug("Did not get a value for reindexUnchangedRecordsVal");
-			reindexUnchangedRecords = true;
-		}else{
-			reindexUnchangedRecords = Boolean.parseBoolean(reindexUnchangedRecordsVal);
-			logger.debug("reindexUnchangedRecords = " + reindexUnchangedRecords + " " + reindexUnchangedRecordsVal);
-		}
-		
-		String checkOverDriveAvailabilityVal = configIni.get("Reindex", "checkOverDriveAvailability");
-		if (checkOverDriveAvailabilityVal == null){
-			checkOverDriveAvailability = true;
-		}else{
-			checkOverDriveAvailability = Boolean.parseBoolean(checkOverDriveAvailabilityVal);
-		}
-		
-		try {
+	public boolean init(Config config) {
+		this.config = config;
+
+
+
+
+        Connection econtentConn = null;
+        try {
+            econtentConn = config.getEcontentDatasource().getConnection();
+        } catch (SQLException e) {
+            logger.error("Couldn't get a connection in ExtractEConentFromMarc", e);
+            return false;
+        }
+
+        try {
 			//Connect to the vufind database
 			doesIlsIdExist = econtentConn.prepareStatement("SELECT id from econtent_record WHERE ilsId = ?");
 			createEContentRecord = econtentConn.prepareStatement("INSERT INTO econtent_record (ilsId, cover, source, title, subTitle, author, author2, description, contents, subject, language, publisher, edition, isbn, issn, upc, lccn, topic, genre, region, era, target_audience, sourceUrl, purchaseUrl, publishDate, marcControlField, accessType, date_added, marcRecord) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", PreparedStatement.RETURN_GENERATED_KEYS);
@@ -121,11 +115,9 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 	@Override
 	public boolean processMarcRecord(MarcProcessor marcProcessor, MarcRecordDetails recordInfo, MarcProcessor.RecordStatus recordStatus, Logger logger) {
 		try {
-			//Check the 856 tag to see if this is a source that we can handle. 
-			results.incRecordsProcessed();
+			//Check the 856 tag to see if this is a source that we can handle.
 			if (!recordInfo.isEContent()){
 				logger.debug("Skipping record, it is not eContent");
-				results.incSkipped();
 				return false;
 			}
 
@@ -156,8 +148,6 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 			HashMap<String, DetectionSettings> detectionSettingsBySource = recordInfo.getEContentDetectionSettings();
 			if (detectionSettingsBySource == null || detectionSettingsBySource.size() == 0){
 				logger.error("Record " + recordInfo.getId() + " was tagged as eContent, but we did not get detection settings for it.");
-				results.addNote("Record " + recordInfo.getId() + " was tagged as eContent, but we did not get detection settings for it.");
-				results.incErrors();
 				return false;
 			}
 			
@@ -175,7 +165,6 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 						logger.debug("Record is unchanged, but reindex unchanged records is on");
 					}else{
 						logger.debug("Skipping because the record is not changed");
-						results.incSkipped();
 						return false;
 					}
 				}else{
@@ -257,14 +246,11 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 					int rowsInserted = createEContentRecord.executeUpdate();
 					if (rowsInserted != 1){
 						logger.error("Could not insert row into the database");
-						results.incErrors();
-						results.addNote("Error inserting econtent record for id " + ilsId + " number of rows updated was not 1");
 					}else{
 						ResultSet generatedKeys = createEContentRecord.getGeneratedKeys();
 						while (generatedKeys.next()){
 							eContentRecordId = generatedKeys.getLong(1);
 							recordAdded = true;
-							results.incAdded();
 						}
 					}
 				}else{
@@ -306,11 +292,8 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 					int rowsInserted = updateEContentRecord.executeUpdate();
 					if (rowsInserted != 1){
 						logger.error("Could not insert row into the database");
-						results.incErrors();
-						results.addNote("Error updating econtent record for id " + ilsId + " number of rows updated was not 1");
 					}else{
 						recordAdded = true;
-						results.incUpdated();
 					}
 				}
 				
@@ -338,13 +321,9 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 			return true;
 		} catch (Exception e) {
 			logger.error("Error importing marc record ", e);
-			results.incErrors();
-			results.addNote("Error extracting eContent for record " + recordInfo.getId() + " " + e.toString());
 			return false;
 		}finally{
-			if (results.getRecordsProcessed() % 100 == 0){
-				results.saveResults();
-			}
+
 		}
 	}
 
@@ -425,8 +404,6 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 			}
 		} catch (SQLException e) {
 			logger.error("Error adding link to record " + eContentRecordId + " " + sourceUrl, e);
-			results.addNote("Error adding link to record " + eContentRecordId + " " + sourceUrl + " " + e.toString());
-			results.incErrors();
 		}
 		
 	}
@@ -485,8 +462,6 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 			}
 		} catch (SQLException e) {
 			logger.error("Error adding overdrive id to record " + eContentRecordId + " " + overDriveId, e);
-			results.addNote("Error adding overdriveid to record " + eContentRecordId + " " + overDriveId + " " + e.toString());
-			results.incErrors();
 		}
 		
 	}
@@ -600,14 +575,10 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 
 	@Override
 	public void finish() {
-		results.addNote("Finished eContent extraction");
-		results.saveResults();
+
 	}
 	
-	@Override 
-	public ProcessorResults getResults() {
-		return results;
-	}
+
 
 	public String getVufindUrl() {
 		return vufindUrl;

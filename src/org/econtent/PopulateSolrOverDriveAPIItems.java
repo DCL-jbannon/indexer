@@ -11,16 +11,18 @@ import org.API.OverDrive.OverDriveAPIUtils;
 import org.apache.solr.common.SolrInputDocument;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.solr.ISolrUtils;
 import org.solr.ISolrWrapper;
 import org.solr.SolrUtils;
-import org.vufind.ProcessorResults;
 
 import db.DBeContentRecordServices;
 import db.IDBeContentRecordServices;
 
 public class PopulateSolrOverDriveAPIItems
 {
+    final static Logger logger = LoggerFactory.getLogger(PopulateOverDriveAPIItems.class);
 
 	private IOverDriveCollectionIterator overDriveAPICollectionIterator;
 	private IDBeContentRecordServices eContentRecordDAO;
@@ -29,25 +31,7 @@ public class PopulateSolrOverDriveAPIItems
 	private IOverDriveAPIServices overDriveApiServices;
 	@SuppressWarnings("unused")
 	private ISolrUtils solrUtils;
-	ProcessorResults processorResults = null;
-	
-	public PopulateSolrOverDriveAPIItems(IOverDriveCollectionIterator overDriveCollectionIterator,
-			 Connection conn, 
-			 ISolrWrapper solrWrapper,
-			 IOverDriveAPIServices overDriveApiServices,
-			 ProcessorResults processorResults)
-	{
-		this(
-				overDriveCollectionIterator,
-				new DBeContentRecordServices(conn),
-				new OverDriveAPIUtils(),
-				solrWrapper,
-				new SolrUtils(),
-				overDriveApiServices
-			);
-		this.processorResults = processorResults;
-	}
-	
+
 	public PopulateSolrOverDriveAPIItems(IOverDriveCollectionIterator overDriveCollectionIterator,
 										 Connection conn, 
 										 ISolrWrapper solrWrapper,
@@ -85,14 +69,11 @@ public class PopulateSolrOverDriveAPIItems
 	
 	public void addNote(String note, Boolean onlySystemOut)
 	{
-		if ( (this.processorResults!=null) && !onlySystemOut)
-		{
-			this.processorResults.addNote(note);
-		}
-		if(onlySystemOut && this.processorResults!= null)
-		{
-			System.out.println(note);
-		}
+        if(onlySystemOut) {
+            System.out.println(note);
+        } else {
+            logger.debug(note);
+        }
 	}
 
 	public void execute() throws SQLException 

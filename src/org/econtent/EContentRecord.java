@@ -21,12 +21,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.API.OverDrive.OverDriveAPIServices;
-import org.apache.log4j.Logger;
 import org.apache.solr.common.SolrInputDocument;
 import org.json.simple.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class EContentRecord {
-	private static Logger logger = Logger.getLogger(EContentRecord.class);
+	private static Logger logger = LoggerFactory.getLogger(EContentRecord.class);
 	private static final String RECORD_TYPE = "econtentRecord";
 	private Map<String, Object> properties;
 	private EContentRecordDAO dao = null;
@@ -35,9 +36,9 @@ public class EContentRecord {
 	/**
 	 * Instantiate a new empty EContentRecord.
 	 */
-	public EContentRecord() {
-		properties = new HashMap<String, Object>();
-		dao = EContentRecordDAO.getInstance();
+	public EContentRecord(EContentRecordDAO eContentRecordDAO) {
+        this.properties = new HashMap<String, Object>();
+		this.dao = eContentRecordDAO;
 	}
 
 	/**
@@ -47,8 +48,8 @@ public class EContentRecord {
 	 * @param rs
 	 * @throws SQLException
 	 */
-	public EContentRecord(ResultSet rs) throws SQLException {
-		this();
+	public EContentRecord(EContentRecordDAO eContentRecordDAO, ResultSet rs) throws SQLException {
+		this(eContentRecordDAO);
 		// fetch all the columns from current row
 		ResultSetMetaData metaData = rs.getMetaData();
 		int columnCount = metaData.getColumnCount();

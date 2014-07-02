@@ -7,7 +7,6 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
-import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -22,13 +21,14 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
 import org.dcl.utils.ActiveEcontentUtils;
 import org.econtent.DetectionSettings;
 import org.ini4j.Ini;
 import org.marc4j.MarcPermissiveStreamReader;
 import org.marc4j.MarcReader;
 import org.marc4j.marc.Record;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.solrmarc.tools.Utils;
 
 import bsh.EvalError;
@@ -47,58 +47,57 @@ import bsh.Interpreter;
  * 
  */
 public class MarcProcessor {
-	private Logger													logger;
-	/** list of path to look for property files in */
-	protected String[]											propertyFilePaths;
-	/** list of path to look for property files in */
-	protected String[]											scriptFilePaths;
-	private String													marcEncoding		= "UTF8";
+    final static Logger logger = LoggerFactory.getLogger(MarcProcessor.class);
 
-	protected String												marcRecordPath;
-	private HashMap<String, MarcIndexInfo>	marcIndexInfo		= new HashMap<String, MarcIndexInfo>();
+    /**
+     * list of path to look for property files in
+     */
+    protected String[] propertyFilePaths;
+    /**
+     * list of path to look for property files in
+     */
+    protected String[] scriptFilePaths;
+    protected String marcRecordPath;
+    protected int recordsProcessed = 0;
+    protected int maxRecordsToProcess = -1;
+    /**
+     * map: keys are solr field names, values inform how to get solr field values
+     */
+    HashMap<String, String[]> marcFieldProps = new HashMap<String, String[]>();
+    /**
+     * map of translation maps. keys are names of translation maps; values are the
+     * translation maps (hence, it's a map of maps)
+     */
+    HashMap<String, Map<String, String>> translationMaps = new HashMap<String, Map<String, String>>();
+    private String marcEncoding = "UTF8";
+    private HashMap<String, MarcIndexInfo> marcIndexInfo = new HashMap<String, MarcIndexInfo>();
+    /**
+     * map of custom methods. keys are names of custom methods; values are the
+     * methods to call for that custom method
+     */
+    private Map<String, Method> customMethodMap = new HashMap<String, Method>();
+    /**
+     * map of script interpreters. keys are names of scripts; values are the
+     * Interpterers
+     */
+    private Map<String, Interpreter> scriptMap = new HashMap<String, Interpreter>();
+    private PreparedStatement insertMarcInfoStmt;
+    private PreparedStatement updateMarcInfoStmt;
+    private Set<String> existingEContentIds = Collections.synchronizedSet(new HashSet<String>());
+    private Map<String, Float> printRatings = Collections.synchronizedMap(new HashMap<String, Float>());
+    private Map<String, Float> econtentRatings = Collections.synchronizedMap(new HashMap<String, Float>());
+    private Map<String, Long> librarySystemFacets = Collections.synchronizedMap(new HashMap<String, Long>());
+    private Map<String, Long> eContentLinkRules = Collections.synchronizedMap(new HashMap<String, Long>());
+    private ArrayList<DetectionSettings> detectionSettings = new ArrayList<DetectionSettings>();
+    private String itemTag;
+    private String locationSubfield;
+    private String urlSubfield;
+    private String sharedEContentLocation;
+    private boolean scrapeItemsForLinks;
 
-	/** map: keys are solr field names, values inform how to get solr field values */
-	HashMap<String, String[]>								marcFieldProps	= new HashMap<String, String[]>();
-
-	public HashMap<String, String[]> getMarcFieldProps() {
-		return marcFieldProps;
-	}
-
-	/**
-	 * map of translation maps. keys are names of translation maps; values are the
-	 * translation maps (hence, it's a map of maps)
-	 */
-	HashMap<String, Map<String, String>>	translationMaps			= new HashMap<String, Map<String, String>>();
-
-	/**
-	 * map of custom methods. keys are names of custom methods; values are the
-	 * methods to call for that custom method
-	 */
-	private Map<String, Method>						customMethodMap			= new HashMap<String, Method>();
-
-	/**
-	 * map of script interpreters. keys are names of scripts; values are the
-	 * Interpterers
-	 */
-	private Map<String, Interpreter>			scriptMap						= new HashMap<String, Interpreter>();
-
-	protected int													recordsProcessed		= 0;
-	protected int													maxRecordsToProcess	= -1;
-	private PreparedStatement							insertMarcInfoStmt;
-	private PreparedStatement							updateMarcInfoStmt;
-
-	private Set<String>								existingEContentIds	= Collections.synchronizedSet(new HashSet<String>());
-	private Map<String, Float>				printRatings				= Collections.synchronizedMap(new HashMap<String, Float>());
-	private Map<String, Float>				econtentRatings			= Collections.synchronizedMap(new HashMap<String, Float>());
-	private Map<String, Long>					librarySystemFacets	= Collections.synchronizedMap(new HashMap<String, Long>());
-	private Map<String, Long>					eContentLinkRules		= Collections.synchronizedMap(new HashMap<String, Long>());
-	private ArrayList<DetectionSettings>	detectionSettings		= new ArrayList<DetectionSettings>();
-
-	private String												itemTag;
-	private String												locationSubfield;
-	private String												urlSubfield;
-	private String												sharedEContentLocation;
-	private boolean												scrapeItemsForLinks;
+    public HashMap<String, String[]> getMarcFieldProps() {
+        return marcFieldProps;
+    }
 
     public static enum RecordStatus {
         RECORD_CHANGED, RECORD_UNCHANGED, RECORD_NEW, RECORD_DELETED
@@ -107,14 +106,10 @@ public class MarcProcessor {
 	private Ini configIni;
 	private Connection econtentConn;
 	
-	private ProcessorResults results;
-	
-	public boolean init(String serverName, Ini configIni, Connection vufindConn, Connection econtentConn, Logger logger, long reindexLogId) {
-		this.logger = logger;
+	public boolean init(String serverName, Ini configIni, Connection vufindConn, Connection econtentConn, long reindexLogId) {
 		this.econtentConn = econtentConn;
 		this.configIni = configIni;
-		
-		results = new ProcessorResults("Process MARC files", reindexLogId, vufindConn, logger);
+
 		
 		marcRecordPath = configIni.get("Reindex", "marcPath");
 		// Get the directory where the marc records are stored.vufindConn
@@ -547,7 +542,7 @@ public class MarcProcessor {
 	 * @return
 	 */
 	protected MarcRecordDetails mapMarcInfo(Record marcRecord, Logger logger) {
-		MarcRecordDetails basicInfo = new MarcRecordDetails(this, marcRecord, logger);
+		MarcRecordDetails basicInfo = new MarcRecordDetails(this, marcRecord);
 		return basicInfo;
 	}
 
@@ -593,7 +588,7 @@ public class MarcProcessor {
 			if (useThreads){
 				ArrayList<MarcProcessorThread> indexingThreads = new ArrayList<MarcProcessorThread>();
 				for (final File marcFile : marcFiles) {
-					results.addNote("Processing " + marcFile.getAbsolutePath());
+                    logger.info("Processing on thread: " + marcFile.getAbsolutePath());
 					MarcProcessorThread marcFileProcess = new MarcProcessorThread(recordProcessors, logger, marcFile);
 					indexingThreads.add(marcFileProcess);
 					marcFileProcess.start();
@@ -610,26 +605,19 @@ public class MarcProcessor {
 				}
 			}else{
 				for (final File marcFile : marcFiles) {
-					results.addNote("Processing " + marcFile.getAbsolutePath());
+                    logger.info("Processing " + marcFile.getAbsolutePath());
 					processMarcFile(recordProcessors, logger, marcFile);
 				}
 			}
 			
 			// suppress econtent records that are not present in MARC files
 			suppressInActiveEContentRecords();
-			results.saveResults();
 			return true;
 		} catch (Exception e) {
 			logger.error("Unable to process marc files", e);
-			results.incErrors();
-			results.addNote("Unable to process marc files. " + e.getMessage());
-			results.saveResults();
 			return false;
 		} catch (Error e) {
 			logger.error("Error processing marc files", e);
-			results.incErrors();
-			results.addNote("Unable to process marc files. " + e.getMessage());
-			results.saveResults();
 			return false;
 		}
 	}
@@ -657,7 +645,6 @@ public class MarcProcessor {
 						if (id == null) {
 							System.out.println("Could not load id for marc record " + recordNumber);
 							System.out.println(marcFieldProps.get("id").toString());
-							results.saveResults();
 							System.exit(1);
 						}
 						MarcIndexInfo marcIndexedInfo = null;
@@ -696,7 +683,7 @@ public class MarcProcessor {
 							processor.processMarcRecord(this, marcInfo, recordStatus, logger);
 						}
 						//logger.info("Adding print title to mysql");
-						// Update the checksum in the database
+						// Update the checksum in the databasel
 						if (recordStatus == RecordStatus.RECORD_CHANGED) {
 							updateMarcInfoStmt.setLong(1, marcInfo.getChecksum());
 							updateMarcInfoStmt.setLong(2, marcIndexedInfo.getChecksum());
@@ -828,8 +815,6 @@ public class MarcProcessor {
 			}
 		} catch (SQLException e) {
 			logger.error("Unable to get a list of inactive econtent records to suppresss.", e);
-			results.addNote("Unable to get a list of inactive econtent records to suppresss. " + e.getMessage());
-			results.incErrors();
 		}
 		
 		// get the number of econtent records in total 
@@ -842,35 +827,30 @@ public class MarcProcessor {
 			}
 		} catch (SQLException e) {
 			logger.error("Unable get a total count of econtent records.", e);
-			results.addNote("Unable get a total count of econtent records." + e.getMessage());
-			results.incErrors();
 		}
 		
 		// calculate the percentage of records to be suppressed, if it is lower
 		// than the configured threshold, then we suppress them, otherwise don't do it
 		long suppressCount = ids.size();
 		double percentSuppressed = ((double) suppressCount / (double) eContentCount) * 100.00;
-		results.addNote("Total number of active eContent records: " + eContentCount);
-		results.addNote("Number of inactive eContent records to suppress: " + suppressCount
-				+ " (" + percentSuppressed + "% of total number of eContent records)");
 		
 		String thresholdStr = configIni.get("Reindex", "eContentSuppressionThreshold");
 		double threshold = (thresholdStr != null && thresholdStr.length() > 0) ? Double.parseDouble(thresholdStr) : 1.00;
 		if (suppressCount > 0 && percentSuppressed < threshold) {
-			results.addNote("Number of eContent records to suppress is LOWER than threshold of " + threshold + "%. Proceeding with record suppression.");
+            logger.info("Number of eContent records to suppress is LOWER than threshold of " + threshold + "%. Proceeding with record suppression.");
 			try {
 				PreparedStatement suppressEContentRecordStmt = econtentConn.prepareStatement("UPDATE econtent_record SET status='deleted' WHERE id=?");
 				for (String id : ids) {
 					suppressEContentRecordStmt.setString(1, id);
-					int updated = suppressEContentRecordStmt.executeUpdate();
-					results.addNote("setting status='deleted' for eContent record with id=" + id + ". " + updated + " record(s) updated.");
+                    suppressEContentRecordStmt.addBatch();
+                    logger.debug("Setting status='deleted' for eContent record with id=" + id);
 				}
+                suppressEContentRecordStmt.executeBatch();
 			} catch (SQLException e) {
 				logger.error("Unable set status='deleted' for eContent record.", e);
-				results.addNote("Unable set status='deleted' for eContent record. " + e.getMessage());
 			}
 		} else {
-			results.addNote("There is no eContent record to suppress or the number of records to suppress is HIGHER than threshold of " + threshold + "%. SKIPPING record suppression.");
+            logger.info("There is no eContent record to suppress or the number of records to suppress is HIGHER than threshold of " + threshold + "%. SKIPPING record suppression.");
 		}
 	}
 }

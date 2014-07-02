@@ -25,10 +25,9 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.log4j.Appender;
-import org.apache.log4j.AsyncAppender;
-import org.apache.log4j.Logger;
 import org.marc4j.marc.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * General utility functions for solrmarc
@@ -38,27 +37,26 @@ import org.marc4j.marc.*;
  */
 
 public final class Utils {
-
-	private final static Pattern				FOUR_DIGIT_PATTERN_BRACES							= Pattern.compile("\\[[12]\\d{3,3}\\]");
-	private final static Pattern				FOUR_DIGIT_PATTERN_ONE_BRACE					= Pattern.compile("\\[[12]\\d{3,3}");
-	private final static Pattern				FOUR_DIGIT_PATTERN_STARTING_WITH_1_2	= Pattern.compile("(20|19|18|17|16|15)[0-9][0-9]");
-	private final static Pattern				FOUR_DIGIT_PATTERN_OTHER_1						= Pattern.compile("l\\d{3,3}");
-	private final static Pattern				FOUR_DIGIT_PATTERN_OTHER_2						= Pattern.compile("\\[19\\]\\d{2,2}");
-	private final static Pattern				FOUR_DIGIT_PATTERN_OTHER_3						= Pattern.compile("(20|19|18|17|16|15)[0-9][-?0-9]");
-	private final static Pattern				FOUR_DIGIT_PATTERN_OTHER_4						= Pattern.compile("i.e. (20|19|18|17|16|15)[0-9][0-9]");
-	private final static Pattern				BC_DATE_PATTERN												= Pattern.compile("[0-9]+ [Bb][.]?[Cc][.]?");
-	private final static Pattern				FOUR_DIGIT_PATTERN										= Pattern.compile("\\d{4,4}");
-	private static Matcher							matcher;
-	private static Matcher							matcher_braces;
-	private static Matcher							matcher_one_brace;
-	private static Matcher							matcher_start_with_1_2;
-	private static Matcher							matcher_l_plus_three_digits;
-	private static Matcher							matcher_bracket_19_plus_two_digits;
-	private static Matcher							matcher_ie_date;
-	private static Matcher							matcher_bc_date;
-	private static Matcher							matcher_three_digits_plus_unk;
-	private final static DecimalFormat	timeFormat														= new DecimalFormat("00.00");
-	protected static Logger							logger																= Logger.getLogger(Utils.class.getName());
+    final static Logger logger = LoggerFactory.getLogger(Utils.class);
+    private final static Pattern FOUR_DIGIT_PATTERN_BRACES = Pattern.compile("\\[[12]\\d{3,3}\\]");
+    private final static Pattern FOUR_DIGIT_PATTERN_ONE_BRACE = Pattern.compile("\\[[12]\\d{3,3}");
+    private final static Pattern FOUR_DIGIT_PATTERN_STARTING_WITH_1_2 = Pattern.compile("(20|19|18|17|16|15)[0-9][0-9]");
+    private final static Pattern FOUR_DIGIT_PATTERN_OTHER_1 = Pattern.compile("l\\d{3,3}");
+    private final static Pattern FOUR_DIGIT_PATTERN_OTHER_2 = Pattern.compile("\\[19\\]\\d{2,2}");
+    private final static Pattern FOUR_DIGIT_PATTERN_OTHER_3 = Pattern.compile("(20|19|18|17|16|15)[0-9][-?0-9]");
+    private final static Pattern FOUR_DIGIT_PATTERN_OTHER_4 = Pattern.compile("i.e. (20|19|18|17|16|15)[0-9][0-9]");
+    private final static Pattern BC_DATE_PATTERN = Pattern.compile("[0-9]+ [Bb][.]?[Cc][.]?");
+    private final static Pattern FOUR_DIGIT_PATTERN = Pattern.compile("\\d{4,4}");
+    private static Matcher matcher;
+    private static Matcher matcher_braces;
+    private static Matcher matcher_one_brace;
+    private static Matcher matcher_start_with_1_2;
+    private static Matcher matcher_l_plus_three_digits;
+    private static Matcher matcher_bracket_19_plus_two_digits;
+    private static Matcher matcher_ie_date;
+    private static Matcher matcher_bc_date;
+    private static Matcher matcher_three_digits_plus_unk;
+    private final static DecimalFormat timeFormat = new DecimalFormat("00.00");
 
 	/**
 	 * Default Constructor It's private, so it can't be instantiated by other
@@ -494,7 +492,7 @@ public final class Utils {
 	 * 
 	 * @param origStr
 	 *          the string to be cleaned
-	 * @param charsB4periodRegEx
+	 * @param precedingCharsRegEx
 	 *          a regular expression that must immediately precede a trailing
 	 *          period IN ORDER FOR THE PERIOD TO BE REMOVED. Note that the
 	 *          regular expression will NOT have the period or '$' at the end.
@@ -646,9 +644,9 @@ public final class Utils {
 	 *          "__DEFAULT" in the map is used.
 	 * @return the new value, as determined by the mapping.
 	 */
-	public static Set<String> remap(Set<String> set, Map<String, String> map, boolean allowDefault) {
-		if (map == null) return (set);
-		Iterator<String> iter = set.iterator();
+	public static Set<String> remap(Set<String> fieldVal, Map<String, String> map, boolean allowDefault) {
+		if (map == null) return (fieldVal);
+		Iterator<String> iter = fieldVal.iterator();
 		Set<String> result = new LinkedHashSet<String>();
 
 		while (iter.hasNext()) {
@@ -1157,37 +1155,6 @@ public final class Utils {
 		default:
 			return (0x00);
 		}
-	}
-
-	@SuppressWarnings("unchecked")
-	public static void setLog4jLogLevel(org.apache.log4j.Level newLevel) {
-		Logger rootLogger = org.apache.log4j.Logger.getRootLogger();
-		Enumeration<Logger> enLogger = rootLogger.getLoggerRepository().getCurrentLoggers();
-		Logger tmpLogger = null;
-		/*
-		 * If logger is root, then need to loop through all loggers under root and
-		 * change their logging levels too. Also, skip sql loggers so they do not
-		 * get effected.
-		 */
-		while (enLogger.hasMoreElements()) {
-			tmpLogger = (Logger) (enLogger.nextElement());
-			tmpLogger.setLevel(newLevel);
-		}
-		Enumeration<Appender> enAppenders = rootLogger.getAllAppenders();
-		Appender appender;
-		while (enAppenders.hasMoreElements()) {
-			appender = (Appender) enAppenders.nextElement();
-
-			if (appender instanceof AsyncAppender) {
-				AsyncAppender asyncAppender = (AsyncAppender) appender;
-				asyncAppender.activateOptions();
-				// rfa = (RollingFileAppender)asyncAppender.getAppender("R");
-				// rfa.activateOptions();
-				// ca = (ConsoleAppender)asyncAppender.getAppender("STDOUT");
-				// ca.activateOptions();
-			}
-		}
-
 	}
 
 }

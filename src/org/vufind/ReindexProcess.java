@@ -4,18 +4,12 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
-import java.util.Date;
 
 import org.API.OverDrive.OverDriveAPIServices;
 import org.API.OverDrive.OverDriveCollectionIterator;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PropertyConfigurator;
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.econtent.EContentIndexer;
 import org.econtent.EContentRecordDAO;
 import org.econtent.ExtractEContentFromMarc;
@@ -23,9 +17,11 @@ import org.econtent.FreegalImporter;
 import org.econtent.PopulateOverDriveAPIItems;
 import org.ini4j.Ini;
 import org.ini4j.InvalidFileFormatException;
-import org.ini4j.Profile.Section;
-import org.solr.SolrWrapper;
+import org.joda.time.DateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.strands.StrandsProcessor;
+import org.vufind.config.Config;
 
 /**
  * Runs the nightly reindex process to update solr index based on the latest
@@ -38,77 +34,40 @@ import org.strands.StrandsProcessor;
  * 
  */
 public class ReindexProcess {
-
-	private static Logger logger = Logger.getLogger(ReindexProcess.class);
-
-	// General configuration
-
-	private static String serverName;
-	private static String indexSettings;
-	private static Ini configIni;
-	private static String solrPort;
-    private static String solrHost;
-
-	// Reporting information
-	private static long reindexLogId;
-	private static long startTime;
-	private static long endTime;
-
-	// Variables to determine what sub processes to run.
-	private static boolean reloadDefaultSchema = false;
-	private static boolean updateSolr = true;
-	private static boolean updateResources = true;
-	private static boolean loadEContentFromMarc = false;
-	private static boolean exportStrandsCatalog = false;
-	private static boolean exportOPDSCatalog = true;
-	private static boolean updateAlphaBrowse = true;
-
-	// Database connections and prepared statements
-	private static Connection vufindConn = null;
-	private static Connection econtentConn = null;
-
+    final static Logger logger = LoggerFactory.getLogger(ReindexProcess.class);
 	/**
 	 * Starts the reindexing process
 	 *
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		startTime = new Date().getTime();
 		// Get the configuration filename
 		if (args.length == 0) {
 			System.out
 					.println("Please enter the server to index as the first parameter");
-			System.exit(1);
+			System.exit(-1);
 		}
-		serverName = args[0];
-		System.setProperty("reindex.process.serverName", serverName);
-
-		if (args.length > 1) {
-			indexSettings = args[1];
-		}
-
-		initializeReindex();
+		String confileFileLoc = args[0];
+        Config config = initializeReindex(new File(confileFileLoc));
 
 		// Runs the export process to extract marc records from the ILS (if
 		// applicable)
 		runExportScript();
 
 		// Reload schemas
-		if (reloadDefaultSchema) {
+		/*if (config.shouldReloadDefaultSchema()) {
 			reloadDefaultSchemas();
-		}
+		}*/
 
 		// Process all records (marc records, econtent that has been added to the
 		// database, and resources)
 		ArrayList<IRecordProcessor> recordProcessors = loadRecordProcesors();
 		if (recordProcessors.size() > 0) {
-			// Do processing of marc records with record processors loaded
-			// above.
-			// includes indexing records
-			// extracting eContent from records
+			// Do processing of marc records with record processors loaded above.
+			// Includes indexing records
+			// Extracting eContent from records
 			// Updating resource information
-			// Saving records to strands - may need to move to resources if we
-			// are doing partial exports
+			// Saving records to strands - may need to move to resources if we are doing partial exports
 			logger.info("START processMarcRecords");
 			processMarcRecords(recordProcessors);
 			logger.info("END processMarcRecords");
@@ -116,13 +75,12 @@ public class ReindexProcess {
 			// Import Freegal records into econtent database
 			logger.info("START import Freegal");
 			FreegalImporter freegalImporter = new FreegalImporter();
-			if (freegalImporter.init(configIni, serverName, reindexLogId,
-					vufindConn, econtentConn, logger)) {
+			if (freegalImporter.init(config)) {
 				recordProcessors.add(freegalImporter);
 				try {
-				freegalImporter.importRecords();
+				    freegalImporter.importRecords();
 				} catch (RuntimeException e) {
-					logger.error(e);
+					logger.error("Unknown error importing Freegal records.", e);
 				}
 			}
 			logger.info("END import Freegal");
@@ -149,10 +107,9 @@ public class ReindexProcess {
 		}
 
 		// Send completion information
-		endTime = new Date().getTime();
 		sendCompletionMessage(recordProcessors);
 
-		logger.info("Finished Reindex for " + serverName);
+		logger.info("Finished Reindex");
 	}
 
 	private static void harvestOverDrive() {
@@ -167,7 +124,7 @@ public class ReindexProcess {
 		OverDriveCollectionIterator odci = new OverDriveCollectionIterator(clientKey, clientSecret, libraryId);
 		OverDriveAPIServices overDriveAPIServices = new OverDriveAPIServices(clientKey, clientSecret, libraryId);
 
-		PopulateOverDriveAPIItems service = new PopulateOverDriveAPIItems(odci, econtentConn, overDriveAPIServices, pr);
+		PopulateOverDriveAPIItems service = new PopulateOverDriveAPIItems(odci, econtentConn, overDriveAPIServices);
 
 		try {
 			service.execute();
@@ -242,7 +199,7 @@ public class ReindexProcess {
 		if (loadEContentFromMarc) {
 			ExtractEContentFromMarc econtentExtractor = new ExtractEContentFromMarc();
 			if (econtentExtractor.init(configIni, serverName, reindexLogId,
-					vufindConn, econtentConn, logger)) {
+					vufindConn, econtentConn)) {
 				supplementalProcessors.add(econtentExtractor);
 			} else {
 				logger.error("Could not initialize econtentExtractor");
@@ -383,7 +340,7 @@ public class ReindexProcess {
 
 		MarcProcessor marcProcessor = new MarcProcessor();
 		marcProcessor.init(serverName, configIni, vufindConn, econtentConn,
-				logger, reindexLogId);
+                reindexLogId);
 
 		if (supplementalProcessors.size() > 0) {
 			logger.info("Processing exported marc records");
@@ -409,193 +366,165 @@ public class ReindexProcess {
 		}
 	}
 
-	private static void initializeReindex() {
+	private static Config initializeReindex(File configFile) {
+
+        Config config = new Config();
+        config.setStartTime(new DateTime());
+        // Parse the configuration file
+        Ini configIni = loadConfigFile(configFile);
+
 		// Delete the existing reindex.log file
-		File solrmarcLog = new File("../../sites/" + serverName
-				+ "/logs/reindex.log");
+        String solrmarcLogLoc = configIni.get("LOG", "solrmarcLog");
+		File solrmarcLog = new File(solrmarcLogLoc);
 		if (solrmarcLog.exists()) {
 			solrmarcLog.delete();
 		}
 		for (int i = 1; i <= 10; i++) {
-			solrmarcLog = new File("../../sites/" + serverName
-					+ "/logs/reindex.log." + i);
-			if (solrmarcLog.exists()) {
-				solrmarcLog.delete();
+			File solrmarcLogExtended = new File(solrmarcLogLoc + "." + i);
+			if (solrmarcLogExtended.exists()) {
+                solrmarcLogExtended.delete();
 			}
 		}
-		solrmarcLog = new File("solrmarc.log");
-		if (solrmarcLog.exists()) {
-			solrmarcLog.delete();
-		}
-		for (int i = 1; i <= 4; i++) {
-			solrmarcLog = new File("solrmarc.log." + i);
-			if (solrmarcLog.exists()) {
-				solrmarcLog.delete();
-			}
-		}
-
 		// Initialize the logger
-		File log4jFile = new File("../../sites/" + serverName
-				+ "/conf/log4j.reindex.properties");
+		File log4jFile = new File(configIni.get("Log", "log4j.reindex.properties"));
 		if (log4jFile.exists()) {
 			PropertyConfigurator.configure(log4jFile.getAbsolutePath());
 		} else {
 			System.out.println("Could not find log4j configuration "
 					+ log4jFile.getAbsolutePath());
-			System.exit(1);
+			System.exit(-1);
 		}
 
-		logger.info("Starting Reindex for " + serverName);
+        logger.info("Running index using config: " + configFile.getAbsolutePath());
 
-		// Parse the configuration file
-		configIni = loadConfigFile("config.ini");
-
-		if (indexSettings != null) {
-			logger.info("Loading index settings from override file "
-					+ indexSettings);
-			String indexSettingsName = "../../sites/" + serverName + "/conf/"
-					+ indexSettings + ".ini";
-			File indexSettingsFile = new File(indexSettingsName);
-			if (!indexSettingsFile.exists()) {
-				indexSettingsName = "../../sites/default/conf/" + indexSettings
-						+ ".ini";
-				indexSettingsFile = new File(indexSettingsName);
-				if (!indexSettingsFile.exists()) {
-					logger.error("Could not find indexSettings file "
-							+ indexSettings);
-					System.exit(1);
-				}
-			}
-			try {
-				Ini indexSettingsIni = new Ini();
-				indexSettingsIni.load(new FileReader(indexSettingsFile));
-				for (Section curSection : indexSettingsIni.values()) {
-					for (String curKey : curSection.keySet()) {
-						logger.debug("Overriding " + curSection.getName() + " "
-								+ curKey + " " + curSection.get(curKey));
-						// System.out.println("Overriding " +
-						// curSection.getName() + " " + curKey + " " +
-						// curSection.get(curKey));
-						configIni.put(curSection.getName(), curKey,
-								curSection.get(curKey));
-					}
-				}
-			} catch (InvalidFileFormatException e) {
-				logger.error(
-						"IndexSettings file is not valid.  Please check the syntax of the file.",
-						e);
-			} catch (IOException e) {
-				logger.error("IndexSettings file could not be read.", e);
-			}
+        String baseURL = configIni.get("Solr", "baseURL");
+		if (baseURL == null || baseURL.length() == 0) {
+            logger.error("Solr baseURL not found in configuration file");
+			System.exit(-1);
 		}
 
-		solrPort = configIni.get("Reindex", "solrPort");
-		if (solrPort == null || solrPort.length() == 0) {
-			logger.error("You must provide the port where the solr index is loaded in the import configuration file");
-			System.exit(1);
-		}
-
-        solrHost = configIni.get("Reindex", "solrHost");
-        if (solrPort == null || solrPort.length() == 0) {
-            logger.error("You must provide the port where the solr index is loaded in the import configuration file");
-            System.exit(1);
-        }
-
-		String reloadDefaultSchemaStr = configIni.get("Reindex",
-				"reloadDefaultSchema");
+        boolean shouldReloadDefaultSchema = false;
+		String reloadDefaultSchemaStr = configIni.get("Reindex", "shouldReloadDefaultSchema");
 		if (reloadDefaultSchemaStr != null) {
-			reloadDefaultSchema = Boolean.parseBoolean(reloadDefaultSchemaStr);
+            shouldReloadDefaultSchema = Boolean.parseBoolean(reloadDefaultSchemaStr);
 		}
-		String updateSolrStr = configIni.get("Reindex", "updateSolr");
+		String updateSolrStr = configIni.get("Reindex", "shouldUpdateSolr");
 		if (updateSolrStr != null) {
-			updateSolr = Boolean.parseBoolean(updateSolrStr);
+            config.setShouldUpdateSolr(Boolean.parseBoolean(updateSolrStr));
 		}
-		String updateResourcesStr = configIni.get("Reindex", "updateResources");
+		String updateResourcesStr = configIni.get("Reindex", "shouldUpdateResources");
 		if (updateResourcesStr != null) {
-			updateResources = Boolean.parseBoolean(updateResourcesStr);
+            config.setShouldUpdateResources(Boolean.parseBoolean(updateResourcesStr));
 		}
-		String exportStrandsCatalogStr = configIni.get("Reindex",
-				"exportStrandsCatalog");
+		String exportStrandsCatalogStr = configIni.get("Reindex", "shouldExportStrandsCatalog");
 		if (exportStrandsCatalogStr != null) {
-			exportStrandsCatalog = Boolean
-					.parseBoolean(exportStrandsCatalogStr);
+            config.setShouldExportStrandsCatalog(Boolean.parseBoolean(exportStrandsCatalogStr));
 		}
-		String exportOPDSCatalogStr = configIni.get("Reindex",
-				"exportOPDSCatalog");
+		String exportOPDSCatalogStr = configIni.get("Reindex", "shouldExportOPDSCatalog");
 		if (exportOPDSCatalogStr != null) {
-			exportOPDSCatalog = Boolean.parseBoolean(exportOPDSCatalogStr);
+            config.setShouldExportOPDSCatalog(Boolean.parseBoolean(exportOPDSCatalogStr));
 		}
-		String loadEContentFromMarcStr = configIni.get("Reindex",
-				"loadEContentFromMarc");
+		String loadEContentFromMarcStr = configIni.get("Reindex", "shouldLoadEContentFromMarc");
 		if (loadEContentFromMarcStr != null) {
-			loadEContentFromMarc = Boolean
-					.parseBoolean(loadEContentFromMarcStr);
+            config.setShouldLoadEContentFromMarc(Boolean.parseBoolean(loadEContentFromMarcStr));
 		}
-		String updateAlphaBrowseStr = configIni.get("Reindex",
-				"updateAlphaBrowse");
+		String updateAlphaBrowseStr = configIni.get("Reindex", "shouldUpdateAlphaBrowse");
 		if (updateAlphaBrowseStr != null) {
-			updateAlphaBrowse = Boolean.parseBoolean(updateAlphaBrowseStr);
+            config.setShouldUpdateAlphaBrowse(Boolean.parseBoolean(updateAlphaBrowseStr));
 		}
 
-		logger.info("Setting up database connections");
-		// Setup connections to vufind and econtent databases
-		String databaseConnectionInfo = Util.cleanIniValue(configIni.get(
-				"Database", "database_vufind_jdbc"));
-		if (databaseConnectionInfo == null
-				|| databaseConnectionInfo.length() == 0) {
-			logger.error("VuFind Database connection information not found in Database Section.  Please specify connection information in database_vufind_jdbc.");
-			System.exit(1);
-		}
-		try {
-			vufindConn = DriverManager.getConnection(databaseConnectionInfo);
-		} catch (SQLException e) {
-			logger.error("Could not connect to vufind database", e);
-			System.exit(1);
-		}
+        // Setup connections to vufind and econtent databases
+        String driverClassName = Util.cleanIniValue(configIni.get("Database", "vufindDBDriver"));
+        String username = configIni.get("Database", "vufindDBusername");
+        String password = configIni.get("Database", "vufindDBpassword");
+        String connectionURL = Util.cleanIniValue(configIni.get("Database", "vufindDBURL"));
 
-		String econtentDBConnectionInfo = Util.cleanIniValue(configIni.get(
-				"Database", "database_econtent_jdbc"));
-		if (econtentDBConnectionInfo == null
-				|| econtentDBConnectionInfo.length() == 0) {
-			logger.error("Database connection information for eContent database not found in Database Section.  Please specify connection information as database_econtent_jdbc key.");
-			System.exit(1);
-		}
-		try {
-			econtentConn = DriverManager
-					.getConnection(econtentDBConnectionInfo);
-		} catch (SQLException e) {
-			logger.error("Could not connect to econtent database", e);
-			System.exit(1);
-		}
+        BasicDataSource vufindDataSource = new BasicDataSource();
+        vufindDataSource.setDriverClassName(driverClassName);
+        vufindDataSource.setUsername(username);
+        vufindDataSource.setPassword(password);
+        vufindDataSource.setUrl(connectionURL);
+        config.setVufindDatasource(vufindDataSource);
 
-		// Initialize EContentRecordDAO class
-        try {
-            EContentRecordDAO.initialize(econtentConn);
-        } catch (SQLException e) {
-            logger.error("Unable to create log entry for reindex process", e);
-            System.exit(0);
-        }
+        driverClassName = Util.cleanIniValue(configIni.get("Database", "econtentDBDriver"));
+        username = configIni.get("Database", "econtentDBusername");
+        password = configIni.get("Database", "econtentDBpassword");
+        connectionURL = Util.cleanIniValue(configIni.get("Database", "econtentDBURL"));
 
+        BasicDataSource econtentDataSource = new BasicDataSource();
+        econtentDataSource.setDriverClassName(driverClassName);
+        econtentDataSource.setUsername(username);
+        econtentDataSource.setPassword(password);
+        econtentDataSource.setUrl(connectionURL);
+        config.setEcontentDatasource(econtentDataSource);
+
+        config.setEContentRecordDAO(new EContentRecordDAO(econtentDataSource));
 
 		// Start a reindex log entry
 		try {
+            Connection connection = vufindDataSource.getConnection();
 			logger.info("Creating log entry for index");
-			PreparedStatement createLogEntryStatement = vufindConn
-					.prepareStatement(
-							"INSERT INTO reindex_log (startTime) VALUES (?)",
-							PreparedStatement.RETURN_GENERATED_KEYS);
-			createLogEntryStatement.setLong(1, new Date().getTime() / 1000);
+            PreparedStatement createLogEntryStatement = connection.prepareStatement(
+                    "INSERT INTO reindex_log (startTime) SET startTime = CURRENT_TIMESTAMP",
+                    PreparedStatement.RETURN_GENERATED_KEYS);
 			createLogEntryStatement.executeUpdate();
 			ResultSet generatedKeys = createLogEntryStatement
 					.getGeneratedKeys();
+            long reindexLogId = -1;
 			if (generatedKeys.next()) {
-				reindexLogId = generatedKeys.getLong(1);
+				config.setReindexLogId(generatedKeys.getLong(1));
 			}
 		} catch (SQLException e) {
 			logger.error("Unable to create log entry for reindex process", e);
 			System.exit(0);
 		}
 
+        //Freegal
+        
+        String freegalUrl = configIni.get("Freegal", "freegalUrl");
+        if (!(freegalUrl == null || freegalUrl.length() == 0)) {
+            config.setFreegalUrl(freegalUrl);
+
+            String freegalUser = configIni.get("Freegal", "freegalUser");
+            if (freegalUser == null || freegalUser.length() == 0) {
+                logger.error("Freegal User not found.  Please specify the barcode of a patron to use while loading freegal information in the freegalUser key.");
+                System.exit(0);
+            }
+            config.setFreegalUser(freegalUser);
+
+            String freegalPIN = configIni.get("Freegal", "freegalPIN");
+            if (freegalPIN == null || freegalPIN.length() == 0) {
+                logger.error("Freegal PIN not found in.  Please specify the PIN of a patron to use while loading freegal information in the freegalPIN key.");
+                System.exit(0);
+            }
+            config.setFreegalPIN(freegalPIN);
+
+            String freegalAPIkey = configIni.get("Freegal", "freegalAPIkey");
+            if (freegalAPIkey == null || freegalAPIkey.length() == 0) {
+                logger.error("Freegal API Key not found.  Please specify the API Key for the Freegal webservices in the freegalAPIkey key.");
+                System.exit(0);
+            }
+            config.setFreegalAPIkey(freegalAPIkey);
+
+            String libraryId = configIni.get("Freegal", "libraryId");
+            if (libraryId == null || libraryId.length() == 0) {
+                logger.error("Freegal Library Id not found.  Please specify the Library for the Freegal webservices the libraryId key.");
+                System.exit(0);
+            }
+            config.setFreegalLibraryId(libraryId);
+        } else {
+
+            logger.error("Freegal API URL not found.  Please specify url in freegalUrl key.");
+            //System.exit(0); Don't quit without Freegal. We might not intend to index
+        }
+
+        //EContent
+        String fullTextPath = configIni.get("EContent", "fullTextPath");
+        if(fullTextPath != null) {
+            config.setEcontentFullTextPath(fullTextPath);
+        }
+
+        return config;
 	}
 
 	private static void sendCompletionMessage(
@@ -622,61 +551,19 @@ public class ReindexProcess {
 		}
 	}
 
-	private static Ini loadConfigFile(String filename) {
-		// First load the default config file
-		String configName = "../../sites/default/conf/" + filename;
-		logger.info("Loading configuration from " + configName);
-		File configFile = new File(configName);
-		if (!configFile.exists()) {
-			logger.error("Could not find configuration file " + configName);
-			System.exit(1);
-		}
-
+	private static Ini loadConfigFile(File configFile) {
 		// Parse the configuration file
 		Ini ini = new Ini();
 		try {
 			ini.load(new FileReader(configFile));
 		} catch (InvalidFileFormatException e) {
-			logger.error(
-					"Configuration file is not valid.  Please check the syntax of the file.",
-					e);
+            System.exit(-1);
 		} catch (FileNotFoundException e) {
-			logger.error(
-					"Configuration file could not be found.  You must supply a configuration file in conf called config.ini.",
-					e);
+            System.exit(-1);
 		} catch (IOException e) {
-			logger.error("Configuration file could not be read.", e);
+            System.exit(-1);
 		}
 
-		// Now override with the site specific configuration
-		String siteSpecificFilename = "../../sites/" + serverName + "/conf/"
-				+ filename;
-		logger.info("Loading site specific config from " + siteSpecificFilename);
-		File siteSpecificFile = new File(siteSpecificFilename);
-		if (!siteSpecificFile.exists()) {
-			logger.error("Could not find server specific config file");
-			System.exit(1);
-		}
-		try {
-			Ini siteSpecificIni = new Ini();
-			siteSpecificIni.load(new FileReader(siteSpecificFile));
-			for (Section curSection : siteSpecificIni.values()) {
-				for (String curKey : curSection.keySet()) {
-					// logger.debug("Overriding " + curSection.getName() + " " +
-					// curKey + " " + curSection.get(curKey));
-					// System.out.println("Overriding " + curSection.getName() +
-					// " " + curKey + " " + curSection.get(curKey));
-					ini.put(curSection.getName(), curKey,
-							curSection.get(curKey));
-				}
-			}
-		} catch (InvalidFileFormatException e) {
-			logger.error(
-					"Site Specific config file is not valid.  Please check the syntax of the file.",
-					e);
-		} catch (IOException e) {
-			logger.error("Site Specific config file could not be read.", e);
-		}
 		return ini;
 	}
 }

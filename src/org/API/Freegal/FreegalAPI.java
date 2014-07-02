@@ -10,9 +10,10 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import org.apache.log4j.Logger;
 import org.econtent.Album;
 import org.econtent.Song;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.vufind.Base64Coder;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -21,7 +22,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 public class FreegalAPI {
-	private static Logger logger = Logger.getLogger(FreegalAPI.class);
+    final static Logger logger = LoggerFactory.getLogger(FreegalAPI.class);
 	private String freegalUrl;
 	private String freegalUser;
 	private String freegalPIN;
@@ -76,7 +77,7 @@ public class FreegalAPI {
 			DocumentBuilder songsDB = documentBuilderFactory.newDocumentBuilder();
 			songsDoc = songsDB.parse(songUrl);
 		} catch (java.io.IOException e) {
-			logger.error(e);
+			logger.error("Error while reading Freegal URL", e);
 			return albums.values();
 		}
 		NodeList songs = songsDoc.getElementsByTagName("Song");

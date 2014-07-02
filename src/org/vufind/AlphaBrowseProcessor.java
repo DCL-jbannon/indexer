@@ -5,40 +5,41 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import org.apache.log4j.Logger;
 import org.ini4j.Ini;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.vufind.config.Config;
 
 public class AlphaBrowseProcessor implements IResourceProcessor, IRecordProcessor {
-	private Logger logger;
-	private Connection vufindConn;
-	private ProcessorResults results;
+    final static Logger logger = LoggerFactory.getLogger(AlphaBrowseProcessor.class);
+
+    Config config = null;
 	/*private TreeMap<String, ArrayList<String>> titleBrowseInfo;
 	private TreeMap<String, ArrayList<String>> authorBrowseInfo;
 	private TreeMap<String, ArrayList<String>> callNumberBrowseInfo;
 	private TreeMap<String, ArrayList<String>> subjectBrowseInfo;*/
 
-	public boolean init(Ini configIni, String serverName, long reindexLogId, Connection vufindConn, Connection econtentConn, Logger logger) {
-		this.logger = logger;
-		this.vufindConn = vufindConn;
-		results = new ProcessorResults("Alpha Browse Table Update", reindexLogId, vufindConn, logger);
+	public boolean init(Config config) {
 		return true;
 	}
 	
 	@Override
 	public boolean processResource(ResultSet resource) {
 		//For alpha browse processing, everything is handled in the finish method
-		results.incResourcesProcessed();
-		if (results.getResourcesProcessed() % 2500 == 0){
-			results.saveResults();
-		}
+
 		return true;
 	}
 
 	@Override
 	public void finish() {
-		logger.info("Building Alphabetic Browse tables");
-		results.addNote("Building Alphabetic Browse tables");
-		results.saveResults();
+        Connection vufindConn = null;
+        try {
+            vufindConn = config.getVufindDatasource().getConnection();
+        } catch (SQLException e) {
+            logger.error("Couldn't get a database connection in AlphaBrowseProcessor");
+            return;
+        }
+        logger.info("Building Alphabetic Browse tables");
 		try {
 			//Run queries to create alphabetic browse tables from resources table
 			try {
@@ -69,12 +70,9 @@ public class AlphaBrowseProcessor implements IResourceProcessor, IRecordProcesso
 				insertBrowseRow.close();
 				
 				logger.info("Added " + (curRow -1) + " rows to title browse table");
-				results.addNote("Added " + (curRow -1) + " rows to title browse table");
 			} catch (SQLException e) {
 				logger.error("Error creating title browse table", e);
-				results.addNote("Error creating title browse table " + e.toString());
 			}
-			results.saveResults();
 			
 			try {
 				//Clear the current browse table
@@ -103,12 +101,9 @@ public class AlphaBrowseProcessor implements IResourceProcessor, IRecordProcesso
 				groupedSortedRS.close();
 				
 				logger.info("Added " + (curRow -1) + " rows to author browse table");
-				results.addNote("Added " + (curRow -1) + " rows to author browse table");
 			} catch (SQLException e) {
 				logger.error("Error creating author browse table", e);
-				results.addNote("Error creating author browse table " + e.toString());
 			}
-			results.saveResults();
 
 			//Setup subject browse
 			try {
@@ -137,12 +132,9 @@ public class AlphaBrowseProcessor implements IResourceProcessor, IRecordProcesso
 				}
 				groupedSortedRS.close();
 				logger.info("Added " + (curRow -1) + " rows to subject browse table");
-				results.addNote("Added " + (curRow -1) + " rows to subject browse table");
 			} catch (SQLException e) {
 				logger.error("Error creating subject browse table", e);
-				results.addNote("Error creating subject browse table " + e.toString());
 			}
-			results.saveResults();
 			
 			//Setup call number browse
 			try {
@@ -171,24 +163,14 @@ public class AlphaBrowseProcessor implements IResourceProcessor, IRecordProcesso
 				}
 				groupedSortedRS.close();
 				logger.info("Added " + (curRow -1) + " rows to call number browse table");
-				results.addNote("Added " + (curRow -1) + " rows to call number browse table");
 			} catch (SQLException e) {
 				logger.error("Error creating callnumber browse table", e);
-				results.addNote("Error creating call number browse table " + e.toString());
 			}
-			results.saveResults();
 		} catch (Error e) {
 			System.out.println("Error updating Alphabetic Browse");
 			e.printStackTrace();
 			logger.error("Error updating Alphabetic Browse", e);
-			results.addNote("Error updating Alphabetic Browse " + e.toString());
-			results.saveResults();
 		}
-	}
-
-	@Override
-	public ProcessorResults getResults() {
-		return results;
 	}
 
 }

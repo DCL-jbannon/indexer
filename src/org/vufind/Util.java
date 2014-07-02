@@ -1,5 +1,7 @@
 package org.vufind;
 
+import org.slf4j.Logger;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -19,8 +21,6 @@ import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
-
-import org.apache.log4j.Logger;
 
 public class Util {
 	public static String convertStreamToString(InputStream is) throws IOException {

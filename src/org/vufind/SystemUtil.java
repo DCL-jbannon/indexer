@@ -1,8 +1,8 @@
 package org.vufind;
 
-import java.io.*;
+import org.slf4j.Logger;
 
-import org.apache.log4j.Logger;
+import java.io.*;
 
 public class SystemUtil {
 	// Used to identify the windows platform.
