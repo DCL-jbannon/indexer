@@ -5,15 +5,19 @@ import org.apache.solr.common.SolrInputDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vufind.config.Config;
+import org.vufind.config.DynamicConfig;
+
+import java.util.List;
 
 public class MarcIndexer implements IMarcRecordProcessor, IRecordProcessor {
     final static Logger logger = LoggerFactory.getLogger(MarcIndexer.class);
 
-    private Config config = null;
+    private DynamicConfig config = null;
     private String coreToIndex;
 
     @Override
-    public boolean init(Config config) {
+    public boolean init(DynamicConfig config) {
+        this.config = config;
         return true;
     }
 
@@ -23,7 +27,9 @@ public class MarcIndexer implements IMarcRecordProcessor, IRecordProcessor {
     }
 
     @Override
-	public boolean processMarcRecord(MarcProcessor processor, MarcRecordDetails recordInfo, MarcProcessor.RecordStatus recordStatus, Logger logger) {
+	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
+        MarcProcessor.RecordStatus recordStatus = recordInfo.getRecordStatus();
+
 		try {
 			if (recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED && !config.shouldReindexUnchangedRecords()){
 				logger.debug("Skipping record["+recordInfo.getId()+"] because it hasn't changed");

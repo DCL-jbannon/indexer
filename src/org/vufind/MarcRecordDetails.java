@@ -53,17 +53,19 @@ import bsh.UtilEvalError;
 public class MarcRecordDetails {
     final static Logger logger = LoggerFactory.getLogger(MarcProcessor.class);
 
-	private MarcProcessor										marcProcessor;
+    private MarcProcessor marcProcessor;
 
-	private Record													record;
-	private HashMap<String, Object>					mappedFields		= new HashMap<String, Object>();
+    private Record record;
+    private HashMap<String, Object> mappedFields = new HashMap<String, Object>();
 
-	private ArrayList<LibrarySpecificLink>	sourceUrls			= new ArrayList<LibrarySpecificLink>();
-	private String													purchaseUrl;
-	private boolean													urlsLoaded;
-	private long														checksum				= -1;
+    private ArrayList<LibrarySpecificLink> sourceUrls = new ArrayList<LibrarySpecificLink>();
+    private String purchaseUrl;
+    private boolean urlsLoaded;
+    private long checksum = -1;
 
-	private boolean													allFieldsMapped	= false;
+    private boolean allFieldsMapped = false;
+
+    private MarcProcessor.RecordStatus recordStatus = MarcProcessor.RecordStatus.RECORD_UNCHANGED;
 
 	/**
 	 * Does basic mapping of fields to determine if the record has changed or not
@@ -81,6 +83,14 @@ public class MarcRecordDetails {
 		String fieldVal[] = marcProcessor.getMarcFieldProps().get("id");
 		mapField("id", fieldVal);
 	}
+
+    public void setRecordStatus(MarcProcessor.RecordStatus recordStatus) {
+        this.recordStatus = recordStatus;
+    }
+
+    public MarcProcessor.RecordStatus getRecordStatus() {
+        return this.recordStatus;
+    }
 
 	/**
 	 * Maps fields based on properties files for use in processors
