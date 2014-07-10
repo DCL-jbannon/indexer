@@ -375,8 +375,6 @@ public class MarcRecordDetails {
 	 *          - the mapping of solr doc field names to values
 	 * @param ixFldName
 	 *          - the name of the field to add to the solr doc
-	 * @param mapName
-	 *          - the name of a translation map for the field value, or null
 	 * @param fieldVal
 	 *          - the (untranslated) field value to add to the solr doc field
 	 */
@@ -496,9 +494,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Get all field values specified by tagStr, joined as a single string.
-	 * 
-	 * @param record
-	 *          - the marc record object
+	 *
 	 * @param tagStr
 	 *          string containing which field(s)/subfield(s) to use. This is a
 	 *          series of: marc "tag" string (3 chars identifying a marc field,
@@ -516,9 +512,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Get the first value specified by the tagStr
-	 * 
-	 * @param record
-	 *          - the marc record object
+	 *
 	 * @param tagStr
 	 *          string containing which field(s)/subfield(s) to use. This is a
 	 *          series of: marc "tag" string (3 chars identifying a marc field,
@@ -570,9 +564,7 @@ public class MarcRecordDetails {
 	 * Given a tag for a field, and a list (or regex) of one or more subfields get
 	 * any linked 880 fields and include the appropriate subfields as a String
 	 * value in the result set.
-	 * 
-	 * @param record
-	 *          - marc record object
+
 	 * @param tag
 	 *          - the marc field for which 880s are sought.
 	 * @param subfield
@@ -705,7 +697,7 @@ public class MarcRecordDetails {
 	 *          - the marc record object
 	 * @param fldTag
 	 *          - the field name, e.g. 008
-	 * @param subfldsStr
+	 * @param subfld
 	 *          - the string containing the desired subfields
 	 * @param beginIx
 	 *          - the beginning index of the substring of the subfield value
@@ -833,9 +825,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Write a marc record as a binary string to the
-	 * 
-	 * @param record
-	 *          marc record object to be written
+	 *
 	 * @return string containing binary (UTF-8 encoded) representation of marc
 	 *         record object.
 	 */
@@ -1240,9 +1230,7 @@ public class MarcRecordDetails {
 	/**
 	 * Get the title (245ab) from a record, without non-filing chars as specified
 	 * in 245 2nd indicator, and lowercased.
-	 * 
-	 * @param record
-	 *          - the marc record object
+	 *
 	 * @return 245a and 245b values concatenated, with trailing punct removed, and
 	 *         with non-filing characters omitted. Null returned if no title can
 	 *         be found.
@@ -1376,8 +1364,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Extract the call number label from a record
-	 * 
-	 * @param record
+	 *
 	 * @return Call number label
 	 */
 	public String getFullCallNumber() {
@@ -1387,8 +1374,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Extract the call number label from a record
-	 * 
-	 * @param record
+	 *
 	 * @return Call number label
 	 */
 	public String getFullCallNumber(String fieldSpec) {
@@ -1404,8 +1390,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Extract the call number label from a record
-	 * 
-	 * @param record
+	 *
 	 * @return Call number label
 	 */
 	public String getCallNumberLabel() {
@@ -1415,8 +1400,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Extract the call number label from a record
-	 * 
-	 * @param record
+	 *
 	 * @return Call number label
 	 */
 	public String getCallNumberLabel(String fieldSpec) {
@@ -1438,8 +1422,7 @@ public class MarcRecordDetails {
 	 * Extract the subject component of the call number
 	 * 
 	 * Can return null
-	 * 
-	 * @param record
+	 *
 	 * @return Call number label
 	 */
 	public String getCallNumberSubject() {
@@ -1451,8 +1434,7 @@ public class MarcRecordDetails {
 	 * Extract the subject component of the call number
 	 * 
 	 * Can return null
-	 * 
-	 * @param record
+	 *
 	 * @return Call number label
 	 */
 	public String getCallNumberSubject(String fieldSpec) {
@@ -1471,8 +1453,7 @@ public class MarcRecordDetails {
 	/**
 	 * Loops through all datafields and creates a field for "all fields"
 	 * searching. Shameless stolen from Vufind Indexer Custom Code
-	 * 
-	 * @param record
+	 *
 	 *          marc record object
 	 * @param lowerBoundStr
 	 *          - the "lowest" marc field to include (e.g. 100). defaults to 100
@@ -1987,9 +1968,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Determine Record Format(s)
-	 * 
-	 * @param Record
-	 *          record
+	 *
 	 * @return Set format of record
 	 */
 	public Set<String> getFormat(String returnFirst) {
@@ -2400,9 +2379,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Determine Record Format(s)
-	 * 
-	 * @param Record
-	 *          record
+	 *
 	 * @return Set format of record
 	 */
 	public Set<String> getTargetAudience() {
@@ -2463,9 +2440,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Determine if a record is illustrated.
-	 * 
-	 * @param Record
-	 *          record
+	 *
 	 * @return String "Illustrated" or "Not Illustrated"
 	 */
 	public String isIllustrated() {
@@ -2720,8 +2695,7 @@ public class MarcRecordDetails {
 	 * Normalize Dewey numbers for searching purposes (uppercase/stripped spaces)
 	 * 
 	 * Can return null
-	 * 
-	 * @param record
+	 *
 	 * @param fieldSpec
 	 *          - which MARC fields / subfields need to be analyzed
 	 * @return Set containing normalized Dewey numbers extracted from specified
@@ -2755,8 +2729,7 @@ public class MarcRecordDetails {
 	 * number!)
 	 * 
 	 * Can return null
-	 * 
-	 * @param record
+	 *
 	 * @param fieldSpec
 	 *          - which MARC fields / subfields need to be analyzed
 	 * @return String containing the first valid Dewey number encountered,
@@ -2839,9 +2812,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Determine Record Format(s)
-	 * 
-	 * @param Record
-	 *          record
+	 *
 	 * @return Set format of record
 	 */
 	public Set<String> getAvailableLocations(String itemField, String statusSubFieldIndicator, String availableStatus, String locationSubField) {

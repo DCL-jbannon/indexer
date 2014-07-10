@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vufind.config.Config;
 import org.vufind.IRecordProcessor;
+import org.vufind.config.DynamicConfig;
 import org.xml.sax.SAXException;
 
 public class FreegalImporter implements IRecordProcessor {
@@ -132,13 +133,18 @@ public class FreegalImporter implements IRecordProcessor {
 	public FreegalImporter() {
 	}
 
-    @Override
+
     public boolean init(Config config) {
         this.config = config;
 
         this.freegalAPI = new FreegalAPI(config.getFreegalUrl(), config.getFreegalUser(), config.getFreegalPIN(),
                 config.getFreegalAPIkey(), config.getFreegalLibraryId());
         return true;
+    }
+
+    @Override
+    public boolean init(DynamicConfig config) {
+        return false;
     }
 
     @Override
@@ -150,4 +156,8 @@ public class FreegalImporter implements IRecordProcessor {
 		}
 	}
 
+    @Override
+    public void accept(Object o) {
+
+    }
 }

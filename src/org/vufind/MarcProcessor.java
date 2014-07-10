@@ -1,38 +1,24 @@
 package org.vufind;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.io.InputStream;
+import bsh.EvalError;
+import bsh.Interpreter;
+import org.dcl.utils.ActiveEcontentUtils;
+import org.econtent.DetectionSettings;
+import org.marc4j.marc.Record;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.solrmarc.tools.Utils;
+import org.vufind.config.DynamicConfig;
+import org.vufind.config.sections.BasicConfigOptions;
+import org.vufind.config.sections.MarcConfigOptions;
+
+import java.io.*;
 import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-
-import org.dcl.utils.ActiveEcontentUtils;
-import org.econtent.DetectionSettings;
-import org.ini4j.Ini;
-import org.marc4j.MarcPermissiveStreamReader;
-import org.marc4j.MarcReader;
-import org.marc4j.marc.Record;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.solrmarc.tools.Utils;
-
-import bsh.EvalError;
-import bsh.Interpreter;
+import java.util.*;
 
 /**
  * Reads Marc Records from a marc file or files Loads the data into fields based
@@ -49,14 +35,8 @@ import bsh.Interpreter;
 public class MarcProcessor {
     final static Logger logger = LoggerFactory.getLogger(MarcProcessor.class);
 
-    /**
-     * list of path to look for property files in
-     */
-    protected String[] propertyFilePaths;
-    /**
-     * list of path to look for property files in
-     */
-    protected String[] scriptFilePaths;
+    protected String translationMapsFolder;
+    protected String scriptFilesFolder;
     protected String marcRecordPath;
     protected int recordsProcessed = 0;
     protected int maxRecordsToProcess = -1;
@@ -95,6 +75,8 @@ public class MarcProcessor {
     private String sharedEContentLocation;
     private boolean scrapeItemsForLinks;
 
+    private Connection econtentConn = null;
+    private Connection vufindConn = null;
     public HashMap<String, String[]> getMarcFieldProps() {
         return marcFieldProps;
     }
@@ -102,74 +84,65 @@ public class MarcProcessor {
     public static enum RecordStatus {
         RECORD_CHANGED, RECORD_UNCHANGED, RECORD_NEW, RECORD_DELETED
     }
-
-	private Ini configIni;
-	private Connection econtentConn;
 	
-	public boolean init(String serverName, Ini configIni, Connection vufindConn, Connection econtentConn, long reindexLogId) {
-		this.econtentConn = econtentConn;
-		this.configIni = configIni;
+	//public boolean init(String serverName, Ini configIni, Connection vufindConn, Connection econtentConn, long reindexLogId) {
+    public boolean init(DynamicConfig config) {
 
-		
-		marcRecordPath = configIni.get("Reindex", "marcPath");
+        String serverName = "fake"; //FIX
+
+
+		marcRecordPath = config.getString(MarcConfigOptions.MARC_FOLDER);
 		// Get the directory where the marc records are stored.vufindConn
 		if (marcRecordPath == null || marcRecordPath.length() == 0) {
 			logger.error("Marc Record Path not found in Reindex Settings.  Please specify the path as the marcPath key.");
 			return false;
 		}
 
-		marcEncoding = configIni.get("Reindex", "marcEncoding");
-		if (marcEncoding == null || marcEncoding.length() == 0) {
-			logger.error("Marc Encoding not found in Reindex Settings.  Please specify the path as the defaultEncoding key.");
-			return false;
-		}
-
 		// Setup where to look for translation maps
-		propertyFilePaths = new String[] { "../../sites/" + serverName + "/translation_maps", "../../sites/default/translation_maps" };
-		scriptFilePaths = new String[] { "../../sites/" + serverName + "/index_scripts", "../../sites/default/index_scripts" };
+		translationMapsFolder = config.getString(BasicConfigOptions.TRANSLATION_MAPS_FOLDER);
+		scriptFilesFolder = config.getString(BasicConfigOptions.SCRIPTS_FOLDER);
+
 		logger.info("Loading marc properties");
 		// Load default marc.properties and marc properties for site into Properties
 		// Object
 		Properties marcProperties = new Properties();
-		try {
-			File marcPropertiesFile = new File("../../sites/default/conf/marc.properties");
+        List marcPropertiesFiles = config.getList(MarcConfigOptions.MARC_PROPERTIES);
+        for(Object propFileO : marcPropertiesFiles) {
+            File propFile = new File(propFileO.toString());
+            try {
+                marcProperties.load(new FileReader(propFile));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
 
-			marcProperties.load(new FileReader(marcPropertiesFile));
-			logger.info("Finished reading marc properties file, found " + marcFieldProps.keySet().size() + " entries");
-			if (serverName != null) {
-				File marcLocalPropertiesFile = new File("../../sites/" + serverName + "/conf/marc_local.properties");
-				if (marcLocalPropertiesFile.exists()) {
-					marcProperties.load(new FileReader(marcLocalPropertiesFile));
-				}
-			}
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
 
 		// Do additional processing of map properties to determine how each should
 		// be processed.
 		processMarcFieldProperties(marcProperties);
 
-		String maxRecordsToProcessValue = configIni.get("Reindex", "maxRecordsToProcess");
+		/*String maxRecordsToProcessValue = configIni.get("Reindex", "maxRecordsToProcess");
 		if (maxRecordsToProcessValue != null) {
 			maxRecordsToProcess = Integer.parseInt(maxRecordsToProcessValue);
-		}
+		}*/
 
 		// Load field information for local call numbers
-		itemTag = configIni.get("Reindex", "itemTag");
+		/*itemTag = configIni.get("Reindex", "itemTag");
 		urlSubfield = configIni.get("Reindex", "itemUrlSubfield");
 		locationSubfield = configIni.get("Reindex", "locationSubfield");
 		sharedEContentLocation = configIni.get("Reindex", "sharedEContentLocation");
 		String scrapeItemsForLinksStr = configIni.get("Reindex", "scrapeItemsForLinks");
 		if (scrapeItemsForLinksStr != null) {
 			scrapeItemsForLinks = Boolean.parseBoolean(scrapeItemsForLinksStr);
-		}
+		}*/
 
 		// Load the checksums of any marc records that have been loaded already
 		// This allows us to detect whether or not the record is new, has changed,
 		// or is deleted
 		logger.info("Loading existing checksums for records");
+        vufindConn = ConnectionProvider.getConnection(config, ConnectionProvider.PrintOrEContent.PRINT);
+        econtentConn = ConnectionProvider.getConnection(config, ConnectionProvider.PrintOrEContent.E_CONTENT);
+
 		try {
 			PreparedStatement existingRecordChecksumsStmt = vufindConn.prepareStatement("SELECT * FROM marc_import");
 			ResultSet existingRecordChecksumsRS = existingRecordChecksumsStmt.executeQuery();
@@ -492,7 +465,7 @@ public class MarcProcessor {
 	 */
 	private void loadTranslationMapValues(String transMapName, String mapName, String mapKeyPrefix) {
 		Properties props = null;
-		props = Utils.loadProperties(propertyFilePaths, transMapName);
+		props = Utils.loadProperties(new String[]{translationMapsFolder}, transMapName);
 		logger.debug("Loading Custom Map: " + transMapName);
 		loadTranslationMapValues(props, mapName, mapKeyPrefix);
 	}
@@ -623,7 +596,7 @@ public class MarcProcessor {
 	}
 
 	private void processMarcFile(ArrayList<IMarcRecordProcessor> recordProcessors, Logger logger, File marcFile) {
-		try {
+		/*try {
 			logger.info("Processing file " + marcFile.toString());
 			// Open the marc record with Marc4j
 			InputStream input = new FileInputStream(marcFile);
@@ -711,7 +684,7 @@ public class MarcProcessor {
 			logger.info("Finished processing file " + marcFile.toString() + " found " + recordNumber + " records");
 		} catch (Exception e) {
 			logger.error("Error processing file " + marcFile.toString(), e);
-		}
+		}*/
 	}
 
 	public Map<String, Method> getCustomMethodMap() {
@@ -734,7 +707,7 @@ public class MarcProcessor {
 		}
 		Interpreter bsh = new Interpreter();
 		bsh.setClassLoader(this.getClass().getClassLoader());
-		InputStream script = Utils.getPropertyFileInputStream(scriptFilePaths, scriptFileName);
+		InputStream script = Utils.getPropertyFileInputStream(new String[]{scriptFilesFolder}, scriptFileName);
 		String scriptContents;
 		try {
 			scriptContents = Utils.readStreamIntoString(script);
@@ -833,8 +806,9 @@ public class MarcProcessor {
 		// than the configured threshold, then we suppress them, otherwise don't do it
 		long suppressCount = ids.size();
 		double percentSuppressed = ((double) suppressCount / (double) eContentCount) * 100.00;
-		
-		String thresholdStr = configIni.get("Reindex", "eContentSuppressionThreshold");
+
+        //I have no idea what this crap is supposed to be doing
+		/*String thresholdStr = configIni.get("Reindex", "eContentSuppressionThreshold");
 		double threshold = (thresholdStr != null && thresholdStr.length() > 0) ? Double.parseDouble(thresholdStr) : 1.00;
 		if (suppressCount > 0 && percentSuppressed < threshold) {
             logger.info("Number of eContent records to suppress is LOWER than threshold of " + threshold + "%. Proceeding with record suppression.");
@@ -851,6 +825,6 @@ public class MarcProcessor {
 			}
 		} else {
             logger.info("There is no eContent record to suppress or the number of records to suppress is HIGHER than threshold of " + threshold + "%. SKIPPING record suppression.");
-		}
+		}*/
 	}
 }

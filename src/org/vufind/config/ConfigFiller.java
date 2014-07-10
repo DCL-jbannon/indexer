@@ -35,6 +35,9 @@ public class ConfigFiller {
     //static void fill(DynamicConfig config, Class<? extends I_ConfigOption> optionsClass, File configFolder) {
     public static void fill(DynamicConfig config, List<I_ConfigOption> options, File configFolder) {
         I_ConfigOption firstOption = options.get(0);
+        if(config.isFilledFor(firstOption.getClass())) {
+            return;
+        }
         String iniPath = firstOption.getClass().getName()+".ini";
         File iniFile = null;
         try {

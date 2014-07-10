@@ -25,6 +25,7 @@ import org.vufind.Util;
 
 import au.com.bytecode.opencsv.CSVReader;
 import org.vufind.config.Config;
+import org.vufind.config.DynamicConfig;
 
 /**
  * Run this export to build the file to import into VuFind
@@ -111,9 +112,8 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 		}
 		return true;
 	}
-	
-	@Override
-	public boolean processMarcRecord(MarcProcessor marcProcessor, MarcRecordDetails recordInfo, MarcProcessor.RecordStatus recordStatus, Logger logger) {
+
+	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
 		try {
 			//Check the 856 tag to see if this is a source that we can handle.
 			if (!recordInfo.isEContent()){
@@ -129,6 +129,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
                 ilsId = recordInfo.getId();
             }
 
+            MarcProcessor.RecordStatus recordStatus = recordInfo.getRecordStatus();
 			if(recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED)
 			{
 				logger.info("Skipping eContent record because has not changed. Size Active Records: " + ActiveEcontentUtils.getList().size());
@@ -573,7 +574,12 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 		
 	}
 
-	@Override
+    @Override
+    public boolean init(DynamicConfig config) {
+        return false;
+    }
+
+    @Override
 	public void finish() {
 
 	}
@@ -583,4 +589,5 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 	public String getVufindUrl() {
 		return vufindUrl;
 	}
+
 }

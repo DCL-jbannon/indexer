@@ -216,13 +216,13 @@ public final class Utils {
 			} while (propertyPaths != null && pathCnt <= propertyPaths.length);
 		}
 		// if we didn't find it as a file, look for it as a URL
-		String errmsg = "Fatal error: Unable to find specified properties file: " + propertyFileName;
-		if (verbose) errmsg = errmsg + "\n Looked in: " + lookedIn;
 		if (in == null) {
 			Utils utilObj = new Utils();
 			URL url = utilObj.getClass().getClassLoader().getResource(propertyFileName);
 			if (url == null) url = utilObj.getClass().getResource("/" + propertyFileName);
 			if (url == null) {
+                String errmsg = "Fatal error: Unable to find specified properties file: " + propertyFileName;
+                if (verbose) errmsg = errmsg + "\n Looked in: " + lookedIn;
 				logger.error(errmsg);
 				throw new IllegalArgumentException(errmsg);
 			}
@@ -242,6 +242,8 @@ public final class Utils {
 			try {
 				in = url.openStream();
 			} catch (IOException e) {
+                String errmsg = "Fatal error: Unable to find specified properties file: " + propertyFileName;
+                if (verbose) errmsg = errmsg + "\n Looked in: " + lookedIn;
 				throw new IllegalArgumentException(errmsg);
 			}
 		}

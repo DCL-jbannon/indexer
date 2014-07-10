@@ -23,6 +23,7 @@ import org.vufind.IRecordProcessor;
 import org.vufind.MarcProcessor;
 import org.vufind.Util;
 import org.vufind.config.Config;
+import org.vufind.config.DynamicConfig;
 
 public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcessor, IRecordProcessor {
     final static Logger logger = LoggerFactory.getLogger(StrandsProcessor.class);
@@ -149,7 +150,7 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 		}
 	}
 
-	@Override
+
 	public boolean processMarcRecord(MarcProcessor processor, MarcRecordDetails recordInfo, MarcProcessor.RecordStatus recordStatus, Logger logger) {
 		try {
 
@@ -210,13 +211,18 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 		}
 	}
 
-	@Override
+    @Override
+    public boolean init(DynamicConfig config) {
+        return false;
+    }
+
+    @Override
 	public void finish() {
 		try {
 			writer.flush();
 			writer.close();
 
-			// Copy the temp file to the correct location so it can be picked up by
+			// Copy the temp file to thel correct location so it can be picked up by
 			// strands
 			File outputFile = new File(config.getStrandsCatalogFile());
 			if (outputFile.exists()) {
@@ -232,4 +238,9 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 			logger.error("Error saving strands catalog", e);
 		}
 	}
+
+    @Override
+    public boolean processMarcRecord(MarcRecordDetails recordInfo) {
+        return false;
+    }
 }

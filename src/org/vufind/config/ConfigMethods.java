@@ -24,4 +24,8 @@ public class ConfigMethods {
 
         return null;
     }
+
+    public static Boolean fillBool(Object o) {
+        return Boolean.parseBoolean(o.toString());
+    }
 }

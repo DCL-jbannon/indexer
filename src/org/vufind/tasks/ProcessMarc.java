@@ -1,19 +1,20 @@
 package org.vufind.tasks;
 
-import org.econtent.EContentIndexer;
-import org.econtent.ExtractEContentFromMarc;
+import org.marc4j.MarcPermissiveStreamReader;
+import org.marc4j.MarcReader;
 import org.marc4j.MarcStreamReader;
-import org.marc4j.marc.Record;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.strands.StrandsProcessor;
-import org.vufind.*;
+import org.vufind.IMarcRecordProcessor;
+import org.vufind.IRecordProcessor;
+import org.vufind.MarcProcessor;
+import org.vufind.MarcRecordDetails;
 import org.vufind.config.ConfigFiller;
 import org.vufind.config.DynamicConfig;
 import org.vufind.config.sections.BasicConfigOptions;
 import org.vufind.config.sections.MarcConfigOptions;
 
-import java.io.File;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -40,60 +41,82 @@ public class ProcessMarc {
         processMarcTask.run(coreName);
     }
 
-    final static Logger logger = LoggerFactory.getLogger(ReInitIndex.class);
+    final static Logger logger = LoggerFactory.getLogger(ProcessMarc.class);
     final DynamicConfig config;
+    final private MarcProcessor marcProcessor;
 
     public ProcessMarc(DynamicConfig config) {
         this.config = config;
+        this.marcProcessor = new MarcProcessor();
+        this.marcProcessor.init(this.config);
     }
 
     public void run(String indexName) {
-        List<IRecordProcessor> recordProcessors = loadRecordProcesors();
+        List<IMarcRecordProcessor> recordProcessors = loadRecordProcessors();
 
-        MarcStreamReader reader = null;
-        List<Record> records = null;
-        while((records = getNextRecords(reader, 1000)).size()>0) {
-            final List<Record> closedOverRecords = records;
-            recordProcessors.parallelStream().forEach((processor) -> processor.accept(closedOverRecords));
+        List<File> marcFiles = getMarcFiles();
+        for(File marcFile : marcFiles) {
+            InputStream input = null;
+            try {input = new FileInputStream(marcFile);} catch (FileNotFoundException e) {e.printStackTrace();}
+            MarcReader reader = new MarcPermissiveStreamReader(input, true, true, "UTF8");
+
+            List<MarcRecordDetails> records = null;
+            while((records = getNextRecords(reader, 1000)).size()>0) {
+                final List<MarcRecordDetails> closedOverRecords = records;
+                recordProcessors.parallelStream().forEach((processor) -> processor.accept(closedOverRecords));
+            }
         }
-
-        /*if (recordProcessors.size() > 0) {
-            // Do processing of marc records with record processors loaded above.
-            // Includes indexing records
-            // Extracting eContent from records
-            // Updating resource information
-            // Saving records to strands - may need to move to resources if we are doing partial exports
-            logger.info("START processMarcRecords");
-            processMarcRecords(recordProcessors);
-            logger.info("END processMarcRecords");
-        }*/
     }
 
-    private List<Record> getNextRecords(MarcStreamReader reader, int limit) {
-        List<Record> records = new ArrayList<Record>();
+    private List<File> getMarcFiles() {
+        File marcRecordDirectory = new File(config.get(MarcConfigOptions.MARC_FOLDER).toString());
+        List<File> marcFiles = null;
+        if (marcRecordDirectory.isDirectory()) {
+            marcFiles = Arrays.asList(marcRecordDirectory.listFiles(new FilenameFilter() {
+                @Override
+                public boolean accept(File dir, String name) {
+                    if (name.matches("(?i).*?\\.(marc|mrc)")) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            }));
+        } else {
+            marcFiles = Arrays.asList(new File[] { marcRecordDirectory });
+        }
+
+        return marcFiles;
+    }
+
+    private List<MarcRecordDetails> getNextRecords(MarcReader reader, int limit) {
+        List<MarcRecordDetails> records = new ArrayList();
         while(reader.hasNext() && records.size()<limit) {
-            records.add(reader.next());
+            try{
+                records.add(new MarcRecordDetails(this.marcProcessor, reader.next()));
+            } catch(Exception e) {
+                e.printStackTrace();
+            }
+
         }
 
         return records;
     }
 
-    private List<IRecordProcessor> loadRecordProcesors() {
+    private List<IMarcRecordProcessor> loadRecordProcessors() {
         List<Class> processorClasses = (List<Class>)config.get(MarcConfigOptions.MARC_RECORD_PROCESSOR);
-        List<IRecordProcessor> processors = new ArrayList<IRecordProcessor>();
+        List<IMarcRecordProcessor> processors = new ArrayList();
 
         for(Class processorClass: processorClasses) {
             Object instance = null;
             try {
                 instance = processorClass.newInstance();
-                if(instance instanceof IRecordProcessor) {
-                    IRecordProcessor processor = (IRecordProcessor)instance;
+                if(instance instanceof IMarcRecordProcessor) {
+                    IMarcRecordProcessor processor = (IMarcRecordProcessor)instance;
                     processor.init(config);
                     processors.add(processor);
                 }
-            } catch (InstantiationException e) {
-                e.printStackTrace();
-            } catch (IllegalAccessException e) {
+            } catch (InstantiationException | IllegalAccessException e) {
                 e.printStackTrace();
             }
 

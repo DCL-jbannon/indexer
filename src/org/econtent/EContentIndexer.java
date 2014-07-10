@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vufind.*;
 import org.vufind.config.Config;
+import org.vufind.config.DynamicConfig;
 
 public class EContentIndexer implements IRecordProcessor, IEContentProcessor {
     final static Logger logger = LoggerFactory.getLogger(EContentIndexer.class);
@@ -86,7 +87,7 @@ public class EContentIndexer implements IRecordProcessor, IEContentProcessor {
 		return true;
 	}
 
-	@Override
+
 	public boolean init(Config config) {
 
 		fullTextPath = config.getEcontentFileFolder();
@@ -153,7 +154,12 @@ public class EContentIndexer implements IRecordProcessor, IEContentProcessor {
 		return true;
 	}
 
-	@Override
+    @Override
+    public boolean init(DynamicConfig config) {
+        return false;
+    }
+
+    @Override
 	public void finish() {
 
 	}
@@ -187,4 +193,10 @@ public class EContentIndexer implements IRecordProcessor, IEContentProcessor {
 		}
 		reader.close();
 	}
+
+    @Override
+    public void accept(Object o) {
+
+        int i = 0;
+    }
 }

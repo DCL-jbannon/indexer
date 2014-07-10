@@ -9,6 +9,7 @@ import org.ini4j.Ini;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vufind.config.Config;
+import org.vufind.config.DynamicConfig;
 
 public class AlphaBrowseProcessor implements IResourceProcessor, IRecordProcessor {
     final static Logger logger = LoggerFactory.getLogger(AlphaBrowseProcessor.class);
@@ -30,7 +31,12 @@ public class AlphaBrowseProcessor implements IResourceProcessor, IRecordProcesso
 		return true;
 	}
 
-	@Override
+    @Override
+    public boolean init(DynamicConfig config) {
+        return false;
+    }
+
+    @Override
 	public void finish() {
         Connection vufindConn = null;
         try {
@@ -173,4 +179,8 @@ public class AlphaBrowseProcessor implements IResourceProcessor, IRecordProcesso
 		}
 	}
 
+    @Override
+    public void accept(Object o) {
+
+    }
 }

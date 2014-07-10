@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.solrmarc.tools.Utils;
 import org.vufind.config.Config;
+import org.vufind.config.DynamicConfig;
 
 public class UpdateResourceInformation implements IMarcRecordProcessor, IEContentProcessor, IRecordProcessor{
     final static Logger logger = LoggerFactory.getLogger(UpdateResourceInformation.class);
@@ -267,7 +268,7 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 	}
 
 	@SuppressWarnings("unchecked")
-	@Override
+
 	public boolean processMarcRecord(MarcProcessor processor, MarcRecordDetails recordInfo, MarcProcessor.RecordStatus recordStatus, Logger logger) {
 		Long resourceId = -1L;
 		
@@ -453,7 +454,12 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 		return true;
 	}
 
-	@Override
+    @Override
+    public boolean init(DynamicConfig config) {
+        return false;
+    }
+
+    @Override
 	public void finish() {
 		if (removeTitlesNotInMarcExport){
 			
@@ -598,4 +604,9 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 
 		}
 	}
+
+    @Override
+    public boolean processMarcRecord(MarcRecordDetails recordInfo) {
+        return false;
+    }
 }
