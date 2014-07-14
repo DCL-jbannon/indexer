@@ -110,31 +110,6 @@ public class Util {
 		return crSeparatedString.toString();
 	}
 	
-	public static String getSemiColonSeparatedString(Object values, boolean prepForCsv) {
-		StringBuffer crSeparatedString = new StringBuffer();
-		if (values instanceof String){
-			if (prepForCsv){
-				crSeparatedString.append(prepForCsv((String)values, true, false));
-			}else{
-				crSeparatedString.append((String)values);
-			}
-		}else if (values instanceof Iterable){
-			@SuppressWarnings("unchecked")
-			Iterable<String> valuesIterable = (Iterable<String>)values;
-			for (String curValue : valuesIterable) {
-				if (crSeparatedString.length() > 0) {
-					crSeparatedString.append(";");
-				}
-				if (prepForCsv){
-					crSeparatedString.append(prepForCsv(curValue, true, false));
-				}else{
-					crSeparatedString.append(curValue);
-				}
-			}
-		}
-		return crSeparatedString.toString();
-	}
-	
 	public static String getCRSeparatedStringFromSet(Set<String> values) {
 		StringBuffer crSeparatedString = new StringBuffer();
 		for (String curValue : values) {
@@ -441,27 +416,6 @@ public class Util {
 		}
 
 		return stringBuffer.toString();
-	}
-
-	public static String prepForCsv(String input, boolean trimTrailingPunctuation, boolean crSeparatedFields) {
-		if (input == null){
-			return "";
-		}
-		if (trimTrailingPunctuation) {
-			input = trimTrailingPunctuation(input);
-		}
-		input = input.replaceAll("'", "`");
-		input = input.replaceAll("\\|", " ");
-		input = input.replaceAll(";", " ");
-		if (crSeparatedFields){
-			input = input.replaceAll("[\\t]", " ");
-			input = input.replaceAll("\\r\\n|\\r|\\n", ";");
-		}else{
-			input = input.replaceAll("[\\r\\n\\t]", " ");
-		}
-		
-		// input = regex.matcher(input).replaceAll("");
-		return input;
 	}
 
 	public static String trimTrailingPunctuation(String format) {

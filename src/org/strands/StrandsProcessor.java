@@ -1,10 +1,6 @@
 package org.strands;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.BufferedWriter;
-import java.io.OutputStreamWriter;
-import java.io.IOException;
+import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
@@ -12,63 +8,56 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.*;
 import java.util.regex.Pattern;
 
+import org.apache.commons.dbcp2.DataSourceConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.vufind.MarcRecordDetails;
-import org.vufind.IEContentProcessor;
-import org.vufind.IMarcRecordProcessor;
-import org.vufind.IRecordProcessor;
-import org.vufind.MarcProcessor;
-import org.vufind.Util;
+import org.supercsv.io.CsvBeanWriter;
+import org.supercsv.io.ICsvBeanWriter;
+import org.supercsv.prefs.CsvPreference;
+import org.vufind.*;
 import org.vufind.config.Config;
+import org.vufind.config.ConfigFiller;
 import org.vufind.config.DynamicConfig;
+import org.vufind.config.sections.BasicConfigOptions;
+import org.vufind.config.sections.StrandsConfigOptions;
 
 public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcessor, IRecordProcessor {
     final static Logger logger = LoggerFactory.getLogger(StrandsProcessor.class);
 
-    private Config config = null;
+    private DynamicConfig config = null;
 
-    private File tempFile = null;
-    private BufferedWriter writer;
-
-	private PreparedStatement getFormatsForRecord = null;
+    private File printCsvTempFile = null;
+    private ICsvBeanWriter printCsvWriter = null;
+    private File econtentCsvTempFile = null;
+    private ICsvBeanWriter econtentCsvWriter = null;
 
 	
 	/**
 	 * Build a csv file to import into strands
 	 */
-	public boolean init(Config config) {
+	public boolean init(DynamicConfig config) {
+        this.config = config;
+
+        ConfigFiller.fill(config, Arrays.asList(StrandsConfigOptions.values()), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
 		logger.info("Creating Catalog File for Strands");
 
-        Connection econtentConn = null;
-        try {
-            econtentConn = config.getEcontentDatasource().getConnection();
-        } catch (SQLException e) {
-            logger.error("Couldn't get connection in StrandsProcessor", e);
-        }
-        //Connect to the eContent database
 		try {
-			//Connect to the vufind database
-			getFormatsForRecord = econtentConn.prepareStatement("SELECT distinct item_type from econtent_item where recordId = ?");
-			
-		} catch (Exception ex) {
-			// handle any errors
-			logger.error("Error processing eContent ", ex);
-			return false;
-		}
-
-		try {
-			// Create a temporary file to write the XML to as it is generated
-			tempFile = File.createTempFile("strands", "csv");
-			CharsetEncoder utf8Encoder = Charset.forName("UTF8").newEncoder();
-			utf8Encoder.onMalformedInput(CodingErrorAction.IGNORE);
-			utf8Encoder.onUnmappableCharacter(CodingErrorAction.IGNORE);
-			writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(tempFile), utf8Encoder));
-
-			// Create header for xml
-			writer.write("id|link|title|author|image_link|publisher|description|genre|format|subject|audience|collection\r\n");
+            if(config.getBool(BasicConfigOptions.DO_FULL_REINDEX)) {
+                //printCsvWriter and econtentCsvWriter are the same because we're just producing one giant file that
+                //will overwrite everything
+                printCsvTempFile = File.createTempFile("strandsFull", "csv");
+                printCsvWriter = new CsvBeanWriter(new FileWriter(printCsvTempFile), CsvPreference.STANDARD_PREFERENCE);
+                econtentCsvTempFile = printCsvTempFile;
+                econtentCsvWriter = printCsvWriter;
+            } else {
+                printCsvTempFile = File.createTempFile("strandsPrint", "csv");
+                printCsvWriter = new CsvBeanWriter(new FileWriter(printCsvTempFile), CsvPreference.STANDARD_PREFERENCE);
+                econtentCsvTempFile = File.createTempFile("strandsEcontent", "csv");
+                econtentCsvWriter = new CsvBeanWriter(new FileWriter(econtentCsvTempFile), CsvPreference.STANDARD_PREFERENCE);
+            }
 
 		} catch (Exception e) {
 			logger.error("Error generating Strands catalog " + e.toString());
@@ -78,70 +67,86 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 		return true;
 	}
 
-	
-	static final Pattern utf8Regex = Pattern.compile("([\\x00-\\x7F]|[\\xC0-\\xDF][\\x80-\\xBF]|[\\xE0-\\xEF][\\x80-\\xBF]{2}|[\\xF0-\\xF7][\\x80-\\xBF]{3})",
-			Pattern.CANON_EQ);
+    private String[] headers = new String[]{
+            "id",
+            "link",
+            "title",
+            "author",
+            "image_link",
+            "publisher",
+            "description",
+            "genre",
+            "format",
+            "subject",
+            "audience",
+            "collection",
+    };
+
+    private void writeHeader(ICsvBeanWriter writer) throws IOException {
+        writer.writeHeader(headers);
+    }
+
+    private final Collection<String> emptyCollection = new ArrayList(Arrays.asList(new String[]{null, ""}));
 
 	@Override
 	public boolean processEContentRecord(String indexName, ResultSet eContentRecord) {
+        PreparedStatement getFormatsForRecord = null;
+        Connection econtentConn = ConnectionProvider.getConnection(config, ConnectionProvider.PrintOrEContent.E_CONTENT);
+        try {
+            getFormatsForRecord = econtentConn.prepareStatement("SELECT distinct item_type from econtent_item where recordId = ?");
+
+        } catch (Exception ex) {
+            // handle any errors
+            logger.error("Error processing eContent ", ex);
+            return false;
+        }
+
 		try {
+            if(config.getBool(BasicConfigOptions.DO_FULL_REINDEX)) {
+                //If this is a partial, then Econtent writes to a separate file and we need a header
+                writeHeader(this.econtentCsvWriter);
+            }
+
 			// Write the id
+            ContentBean content = new ContentBean();
+
 			String id = eContentRecord.getString("id");
 			logger.info("Processing eContentRecord " + id);
-			writer.write("'econtentRecord" + id + "'");
-			// Write a link to the title
-			writer.write("|'" + config.getVufindUrl() + "/EContentRecord/" + id + "'");
-			writer.write("|'" + Util.prepForCsv(eContentRecord.getString("title"), true, false) + "'");
-			StringBuffer authors = new StringBuffer();
-			authors.append(Util.prepForCsv(eContentRecord.getString("author"), true, false));
-			String author2 = Util.prepForCsv(eContentRecord.getString("author2"), true,true);
-			if (author2.length() > 0){
-				if (authors.length() > 0){
-					authors.append(";");
-				}
-				authors.append(author2);
-			}
-			writer.write("|'" + authors.toString() + "'");
+            content.setId("'econtentRecord" + id + "'");
+            content.setLink(config.getString(BasicConfigOptions.VUFINDDB_URL) + "/EContentRecord/" + id);
+            content.setTitle(eContentRecord.getString("title"));
 
-			// Get the image link
-			String isbn = eContentRecord.getString("isbn");
-			String upc = eContentRecord.getString("upc");
-			writer.write("|'" + config.getStrandsBookcoverUrl() + "/bookcover.php?isn=" + isbn + "&upc=" + upc + "&id=econtentRecord" + id + "&size=small&econtent=true'");
+            List<String> authors = new ArrayList();
+            authors.add(eContentRecord.getString("author"));
+            authors.add(eContentRecord.getString("author2"));
+            authors.removeAll(emptyCollection);
+            content.setAuthor(getSemiColonSeparatedString(authors, true));
 
-			// Get the publisher
-			String publisher = eContentRecord.getString("publisher");
-			writer.write("|'" + Util.prepForCsv(publisher, true, true) + "'");
+            String isbn = eContentRecord.getString("isbn");
+            String upc = eContentRecord.getString("upc");
+            content.setImage_link(config.getString(BasicConfigOptions.BOOK_COVER_URL)+ "?isn=" + isbn + "&upc=" + upc + "&id=econtentRecord" + id + "&size=small&econtent=true");
 
-			// Get the description
-			writer.write("|'" + Util.prepForCsv(eContentRecord.getString("description"), false, true) + "'");
+            content.setPublisher(eContentRecord.getString("publisher"));
 
-			// Get the genre
-			writer.write("|'" + Util.prepForCsv(eContentRecord.getString("genre"), true, true) + "'");
+            content.setDescription(prepForCsv(eContentRecord.getString("description")));
 
-			// Get the format
-			StringBuffer formats = new StringBuffer();
-			getFormatsForRecord.setString(1, id);
-			ResultSet formatsRs = getFormatsForRecord.executeQuery();
-			
-			while (formatsRs.next()) {
-				String format = formatsRs.getString(1);
-				if (formats.length() > 0) {
-					formats.append(";");
-				}
-				formats.append(Util.prepForCsv(format, true, true));
-			}
-			writer.write("|'" + formats.toString() + "'");
+            content.setGenre(prepForCsv(eContentRecord.getString("genre")));
 
-			// Get the subjects
-			writer.write("|'" + Util.prepForCsv(eContentRecord.getString("subject"), true, true) + "'");
+            List<String> formats = new ArrayList();
+            getFormatsForRecord.setString(1, id);
+            ResultSet formatsRs = getFormatsForRecord.executeQuery();
+            while (formatsRs.next()) {
+                formats.add(formatsRs.getString(1));
+            }
+            content.setFormat(getSemiColonSeparatedString(formats, true));
 
-			// Get the audiences
-			writer.write("|'" + Util.prepForCsv(eContentRecord.getString("target_audience"), true, true) + "'");
+            content.setSubject(eContentRecord.getString("subject"));
 
-			// Get the format categories
-			writer.write("|'EMedia'");
+            content.setAudience(eContentRecord.getString("target_audience"));
 
-			writer.write("\r\n");
+            content.setCollection("EMedia");
+
+            this.econtentCsvWriter.write(content, headers);
 			
 			return true;
 		} catch (Exception e) {
@@ -151,58 +156,45 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 	}
 
 
-	public boolean processMarcRecord(MarcProcessor processor, MarcRecordDetails recordInfo, MarcProcessor.RecordStatus recordStatus, Logger logger) {
+	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
 		try {
 
-            if(recordStatus == MarcProcessor.RecordStatus.RECORD_DELETED) {
+            if(recordInfo.getRecordStatus() == MarcProcessor.RecordStatus.RECORD_DELETED) {
                 return true;
             }
 
-			// Write the id
-			writer.write("'" + recordInfo.getId() + "'");
-			// Write a link to the title
-			writer.write("|'" + config.getVufindUrl() + "/Record/" + recordInfo.getId() + "'");
-			writer.write("|'" + Util.prepForCsv(recordInfo.getTitle(), true, false) + "'");
-			StringBuffer authors = new StringBuffer();
-			for (String author : recordInfo.getAuthors()) {
-				if (authors.length() > 0) {
-					authors.append(";");
-				}
-				authors.append(Util.prepForCsv(author, true, false));
-			}
-			writer.write("|'" + authors.toString() + "'");
+            writeHeader(this.printCsvWriter);
 
-			// Get the image link
-			writer.write("|'" + config.getStrandsBookcoverUrl() + "/bookcover.php?isn=" + recordInfo.getIsbn() + "&upc=" + recordInfo.getFirstFieldValueInSet("upc") + "&id="
-					+ recordInfo.getId() + "&amp;size=small'");
+            // Write the id
+            ContentBean content = new ContentBean();
 
-			// Get the publisher
-			writer.write("|'" + Util.prepForCsv(recordInfo.getFirstFieldValueInSet("publisher"), true, false) + "'");
+            logger.info("Processing record: "+recordInfo.getId());
+            content.setId(recordInfo.getId());
 
-			// Get the description
-			writer.write("|'" + Util.prepForCsv(recordInfo.getDescription(), false, false) + "'");
+            content.setLink(config.getString(BasicConfigOptions.VUFINDDB_URL) + "/Record/" + recordInfo.getId());
+            content.setTitle(recordInfo.getTitle());
 
-			// Get the genre
-			String genres = Util.getSemiColonSeparatedString(recordInfo.getMappedField("genre"), true);
-			writer.write("|'" + genres + "'");
+            content.setAuthor(getSemiColonSeparatedString(recordInfo.getAuthors().removeAll(emptyCollection), true));
 
-			// Get the format
-			String formats = Util.getSemiColonSeparatedString(recordInfo.getMappedField("format"), true);
-			writer.write("|'" + formats.toString() + "'");
+            content.setImage_link(config.getString(BasicConfigOptions.BOOK_COVER_URL)
+                    + "?isn=" + recordInfo.getIsbn()
+                    + "&upc=" + recordInfo.getFirstFieldValueInSet("upc")
+                    + "&id=" + recordInfo.getId()
+                    + "&size=small");
 
-			// Get the subjects
-			String subjects = Util.getSemiColonSeparatedString(recordInfo.getMappedField("topic"), true);
-			writer.write("|'" + subjects.toString() + "'");
+            content.setPublisher(recordInfo.getFirstFieldValueInSet("publisher"));
 
-			// Get the audiences
-			String audiences = Util.getSemiColonSeparatedString(recordInfo.getMappedField("target_audience"), true);
-			writer.write("|'" + audiences.toString() + "'");
+            content.setDescription(recordInfo.getDescription());
 
-			// Get the format categories
-			String categories = Util.getSemiColonSeparatedString(recordInfo.getMappedField("format_category"), true);
-			writer.write("|'" + categories.toString() + "'");
+            content.setGenre(getSemiColonSeparatedString(recordInfo.getMappedField("genre"), true));
 
-			writer.write("\r\n");
+            content.setFormat(getSemiColonSeparatedString(recordInfo.getMappedField("format"), true));
+
+            content.setSubject(getSemiColonSeparatedString(recordInfo.getMappedField("topic"), true));
+
+            content.setAudience(getSemiColonSeparatedString(recordInfo.getMappedField("target_audience"), true));
+
+            content.setCollection(getSemiColonSeparatedString(recordInfo.getMappedField("format_category"), true));
 			
 			return true;
 		} catch (IOException e) {
@@ -211,36 +203,83 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 		}
 	}
 
-    @Override
-    public boolean init(DynamicConfig config) {
-        return false;
+    private void copyToOutput(File outputFile, File tempFile) {
+        if (outputFile.exists()) {
+            outputFile.delete();
+        }
+
+        if (!tempFile.renameTo(outputFile)) {
+            logger.error("Could not copy the temp file to the final output file.");
+        } else {
+            logger.info("Strands output file has been created as " + outputFile.getAbsolutePath());
+        }
     }
 
     @Override
 	public void finish() {
-		try {
-			writer.flush();
-			writer.close();
+        if(this.printCsvWriter!=null) {
+            try {
+                this.printCsvWriter.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
 
-			// Copy the temp file to thel correct location so it can be picked up by
-			// strands
-			File outputFile = new File(config.getStrandsCatalogFile());
-			if (outputFile.exists()) {
-				outputFile.delete();
-			}
-			if (!tempFile.renameTo(outputFile)) {
-				logger.error("Could not copy the temp file to the final output file.");
-			} else {
-				logger.info("Output file has been created as " + config.getStrandsCatalogFile());
-			}
-			
-		} catch (IOException e) {
-			logger.error("Error saving strands catalog", e);
-		}
-	}
+        if(this.econtentCsvWriter!=null) {
+            try {
+                this.econtentCsvWriter.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
 
-    @Override
-    public boolean processMarcRecord(MarcRecordDetails recordInfo) {
-        return false;
+        // Copy the temp file to the correct location so it can be picked up by
+        // strands
+        if(config.getBool(BasicConfigOptions.DO_FULL_REINDEX)) {
+            String loc = config.getString(StrandsConfigOptions.FULL_RECATALOG_CSV_LOC);
+            copyToOutput(new File(loc), this.printCsvTempFile);
+
+        } else {
+            String loc = config.getString(StrandsConfigOptions.PARTIAL_RECATALOG_PRINT_CSV_LOC);
+            copyToOutput(new File(loc), this.printCsvTempFile);
+
+            loc = config.getString(StrandsConfigOptions.PARTIAL_RECATALOG_ECONTENT_CSV_LOC);
+            copyToOutput(new File(loc), this.econtentCsvTempFile);
+        }
+    }
+
+    private static String prepForCsv(String value) {
+        String ret = value.trim();
+        if(value.endsWith(".")) {
+            ret = ret.substring(0, ret.length()-1);
+        }
+        //Strands uses semicolon to designate and array
+        ret.replace(";", " ");
+        return ret;
+    }
+
+    private static String getSemiColonSeparatedString(Object values, boolean prepForCsv) {
+        StringBuffer crSeparatedString = new StringBuffer();
+        if (values instanceof String){
+            if (prepForCsv){
+                crSeparatedString.append(prepForCsv((String)values));
+            }else{
+                crSeparatedString.append((String)values);
+            }
+        }else if (values instanceof Iterable){
+            @SuppressWarnings("unchecked")
+            Iterable<String> valuesIterable = (Iterable<String>)values;
+            for (String curValue : valuesIterable) {
+                if (crSeparatedString.length() > 0) {
+                    crSeparatedString.append(";");
+                }
+                if (prepForCsv){
+                    crSeparatedString.append(prepForCsv(curValue));
+                }else{
+                    crSeparatedString.append(curValue);
+                }
+            }
+        }
+        return crSeparatedString.toString();
     }
 }

@@ -36,6 +36,7 @@ public class ProcessMarc {
         DynamicConfig config = new DynamicConfig();
         ConfigFiller.fill(config, Arrays.asList(BasicConfigOptions.values()), new File(configFolder));
         ConfigFiller.fill(config, Arrays.asList(MarcConfigOptions.values()), new File(configFolder));
+        config.put(BasicConfigOptions.CONFIG_FOLDER, configFolder);
 
         ProcessMarc processMarcTask = new ProcessMarc(config);
         processMarcTask.run(coreName);

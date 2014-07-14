@@ -13,13 +13,13 @@ import java.util.Hashtable;
  * Created by jbannon on 7/8/14.
  */
 public class ConnectionProvider {
-    enum PrintOrEContent {
+    public static enum PrintOrEContent {
         PRINT,
         E_CONTENT
     }
 
     static final Hashtable<PrintOrEContent, BasicDataSource> dataSourceHashtable = new Hashtable();
-    static Connection getConnection(DynamicConfig config, PrintOrEContent printOrEContent) {
+    public static Connection getConnection(DynamicConfig config, PrintOrEContent printOrEContent) {
         if(dataSourceHashtable.isEmpty()) {
             loadDataSources(config);
         }
@@ -32,7 +32,7 @@ public class ConnectionProvider {
         return null;
     }
 
-    static void loadDataSources(DynamicConfig config) {
+    private static void loadDataSources(DynamicConfig config) {
         // Setup connections to vufind and econtent databases
 
         BasicDataSource vufindDataSource = new BasicDataSource();
