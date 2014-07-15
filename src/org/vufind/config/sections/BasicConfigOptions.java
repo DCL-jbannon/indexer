@@ -24,7 +24,8 @@ public enum BasicConfigOptions implements I_ConfigOption {
     TRANSLATION_MAPS_FOLDER(ConfigMethods::fillSimpleString, false),
     SCRIPTS_FOLDER(ConfigMethods::fillSimpleString, false),
     DO_FULL_REINDEX(ConfigMethods::fillBool, false),
-    BOOK_COVER_URL(ConfigMethods::fillSimpleString, false)
+    BOOK_COVER_URL(ConfigMethods::fillSimpleString, false),
+    VUFIND_URL(ConfigMethods::fillSimpleString, false),
     ;
 
     final private Function fillFunction;

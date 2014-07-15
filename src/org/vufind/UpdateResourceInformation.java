@@ -1,29 +1,23 @@
 package org.vufind;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
-
-import org.ini4j.Ini;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.solrmarc.tools.Utils;
 import org.vufind.config.Config;
 import org.vufind.config.DynamicConfig;
+import org.vufind.config.sections.BasicConfigOptions;
+import org.vufind.config.sections.MarcConfigOptions;
 
-public class UpdateResourceInformation implements IMarcRecordProcessor, IEContentProcessor, IRecordProcessor{
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.*;
+
+public class UpdateResourceInformation implements IMarcRecordProcessor, IEContentProcessor{
     final static Logger logger = LoggerFactory.getLogger(UpdateResourceInformation.class);
 
-    Config config = null;
-
-	private boolean updateUnchangedResources = false;
-	private boolean removeTitlesNotInMarcExport = false;
+    private DynamicConfig config = null;
 	
 	private PreparedStatement resourceUpdateStmt = null;
 	private PreparedStatement resourceUpdateStmtNoMarc = null;
@@ -72,15 +66,10 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 
     private PreparedStatement transferUserResourceStmt;
 	
-	public boolean init(Config config) {
+	public boolean init(DynamicConfig config) {
 		// Load configuration
         this.config = config;
-        Connection vufindConn = null;
-        try {
-            vufindConn = config.getVufindDatasource().getConnection();
-        } catch (SQLException e) {
-            logger.error("Couldn't get connection in UpdateResourceInformatino", e);
-        }
+        Connection vufindConn = ConnectionProvider.getConnection(config, ConnectionProvider.PrintOrEContent.PRINT);
 
         try {
 			// Setup prepared statements
@@ -267,9 +256,7 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 		}
 	}
 
-	@SuppressWarnings("unchecked")
-
-	public boolean processMarcRecord(MarcProcessor processor, MarcRecordDetails recordInfo, MarcProcessor.RecordStatus recordStatus, Logger logger) {
+	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
 		Long resourceId = -1L;
 		
 		boolean updateSubjectAndCallNumber = true;
@@ -282,7 +269,9 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 			}
 			return true;
 		}
-		if (recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED && !updateUnchangedResources){
+
+        boolean updateUnchangedResources = config.getBool(BasicConfigOptions.DO_FULL_REINDEX);
+		if (recordInfo.getRecordStatus() == MarcProcessor.RecordStatus.RECORD_UNCHANGED && !updateUnchangedResources){
 			boolean updateResource = false; 
 			BasicResourceInfo basicResourceInfo = existingResources.get(recordInfo.getId());
 			if (basicResourceInfo != null && basicResourceInfo.getResourceId() != null ){
@@ -307,7 +296,7 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 				//Remove the resource from the existingResourcesList so 
 				//We can determine which resources no longer exist
 
-                if(recordStatus == MarcProcessor.RecordStatus.RECORD_DELETED) {
+                if(recordInfo.getRecordStatus() == MarcProcessor.RecordStatus.RECORD_DELETED) {
                     existingResources.remove(recordInfo.getId());
                 }
 
@@ -426,9 +415,9 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 					}
 				}
 
-                String callNumberSubfield = config.getCallNumberSubfield();
-                String locationSubfield = config.getLocationSubfield();
-                String itemTag = config.getItemTag();
+                String callNumberSubfield = config.getString(MarcConfigOptions.CALL_NUMBER_SUBFIELD);
+                String locationSubfield = config.getString(MarcConfigOptions.LOCATION_SUBFIELD);
+                String itemTag = config.getString(MarcConfigOptions.ITEM_TAG);
 
                 if (callNumberSubfield!= null && callNumberSubfield.length() > 0 && locationSubfield != null && locationSubfield.length() > 0){
 					//Add call numbers based on the location
@@ -455,13 +444,8 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 	}
 
     @Override
-    public boolean init(DynamicConfig config) {
-        return false;
-    }
-
-    @Override
 	public void finish() {
-		if (removeTitlesNotInMarcExport){
+		if (config.getBool(MarcConfigOptions.REMOVE_RECORDS_NOT_IN_MARC_EXPORT)){
 			
 			//Mark any resources that no longer exist as deleted.
 			int numResourcesToDelete = 0;
@@ -604,9 +588,4 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 
 		}
 	}
-
-    @Override
-    public boolean processMarcRecord(MarcRecordDetails recordInfo) {
-        return false;
-    }
 }

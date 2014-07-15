@@ -67,6 +67,10 @@ public class ProcessMarc {
                 recordProcessors.parallelStream().forEach((processor) -> processor.accept(closedOverRecords));
             }
         }
+
+        for (IMarcRecordProcessor processor : recordProcessors) {
+            processor.finish();
+        }
     }
 
     private List<File> getMarcFiles() {

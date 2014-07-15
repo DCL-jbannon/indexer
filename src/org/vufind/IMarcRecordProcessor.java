@@ -6,7 +6,7 @@ import org.vufind.config.DynamicConfig;
 import java.util.List;
 import java.util.function.Consumer;
 
-public interface IMarcRecordProcessor extends Consumer {
+public interface IMarcRecordProcessor extends Consumer, IRecordProcessor {
 	public boolean processMarcRecord(MarcRecordDetails recordInfo);
     public boolean init(DynamicConfig config);
     default void accept(Object o)

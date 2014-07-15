@@ -1,28 +1,23 @@
 package org.strands;
 
-import java.io.*;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetEncoder;
-import java.nio.charset.CodingErrorAction;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.*;
-import java.util.regex.Pattern;
-
-import org.apache.commons.dbcp2.DataSourceConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.supercsv.io.CsvBeanWriter;
 import org.supercsv.io.ICsvBeanWriter;
 import org.supercsv.prefs.CsvPreference;
 import org.vufind.*;
-import org.vufind.config.Config;
 import org.vufind.config.ConfigFiller;
 import org.vufind.config.DynamicConfig;
 import org.vufind.config.sections.BasicConfigOptions;
 import org.vufind.config.sections.StrandsConfigOptions;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.*;
 
 public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcessor, IRecordProcessor {
     final static Logger logger = LoggerFactory.getLogger(StrandsProcessor.class);
@@ -48,15 +43,18 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
             if(config.getBool(BasicConfigOptions.DO_FULL_REINDEX)) {
                 //printCsvWriter and econtentCsvWriter are the same because we're just producing one giant file that
                 //will overwrite everything
-                printCsvTempFile = File.createTempFile("strandsFull", "csv");
+                printCsvTempFile = File.createTempFile("strandsFull", ".csv");
                 printCsvWriter = new CsvBeanWriter(new FileWriter(printCsvTempFile), CsvPreference.STANDARD_PREFERENCE);
                 econtentCsvTempFile = printCsvTempFile;
                 econtentCsvWriter = printCsvWriter;
+                writeHeader(this.printCsvWriter);
             } else {
-                printCsvTempFile = File.createTempFile("strandsPrint", "csv");
+                printCsvTempFile = File.createTempFile("strandsPrint", ".csv");
                 printCsvWriter = new CsvBeanWriter(new FileWriter(printCsvTempFile), CsvPreference.STANDARD_PREFERENCE);
-                econtentCsvTempFile = File.createTempFile("strandsEcontent", "csv");
+                econtentCsvTempFile = File.createTempFile("strandsEcontent", ".csv");
                 econtentCsvWriter = new CsvBeanWriter(new FileWriter(econtentCsvTempFile), CsvPreference.STANDARD_PREFERENCE);
+                writeHeader(this.printCsvWriter);
+                writeHeader(this.econtentCsvWriter);
             }
 
 		} catch (Exception e) {
@@ -102,18 +100,13 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
         }
 
 		try {
-            if(config.getBool(BasicConfigOptions.DO_FULL_REINDEX)) {
-                //If this is a partial, then Econtent writes to a separate file and we need a header
-                writeHeader(this.econtentCsvWriter);
-            }
-
 			// Write the id
             ContentBean content = new ContentBean();
 
 			String id = eContentRecord.getString("id");
 			logger.info("Processing eContentRecord " + id);
             content.setId("'econtentRecord" + id + "'");
-            content.setLink(config.getString(BasicConfigOptions.VUFINDDB_URL) + "/EContentRecord/" + id);
+            content.setLink(config.getString(BasicConfigOptions.VUFIND_URL) + "/EContentRecord/" + id);
             content.setTitle(eContentRecord.getString("title"));
 
             List<String> authors = new ArrayList();
@@ -163,18 +156,18 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
                 return true;
             }
 
-            writeHeader(this.printCsvWriter);
-
             // Write the id
             ContentBean content = new ContentBean();
 
             logger.info("Processing record: "+recordInfo.getId());
             content.setId(recordInfo.getId());
 
-            content.setLink(config.getString(BasicConfigOptions.VUFINDDB_URL) + "/Record/" + recordInfo.getId());
+            content.setLink(config.getString(BasicConfigOptions.VUFIND_URL) + "/Record/" + recordInfo.getId());
             content.setTitle(recordInfo.getTitle());
 
-            content.setAuthor(getSemiColonSeparatedString(recordInfo.getAuthors().removeAll(emptyCollection), true));
+            Set<String> authors = recordInfo.getAuthors();
+            authors.removeAll(emptyCollection);
+            content.setAuthor(getSemiColonSeparatedString(authors, true));
 
             content.setImage_link(config.getString(BasicConfigOptions.BOOK_COVER_URL)
                     + "?isn=" + recordInfo.getIsbn()
@@ -195,7 +188,9 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
             content.setAudience(getSemiColonSeparatedString(recordInfo.getMappedField("target_audience"), true));
 
             content.setCollection(getSemiColonSeparatedString(recordInfo.getMappedField("format_category"), true));
-			
+
+            this.printCsvWriter.write(content, headers);
+
 			return true;
 		} catch (IOException e) {
 			logger.error("Error writing to catalog file, " + e.toString());

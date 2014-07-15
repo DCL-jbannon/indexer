@@ -12,7 +12,11 @@ public enum MarcConfigOptions implements I_ConfigOption {
     MARC_RECORD_PROCESSOR(ConfigMethods::fillClass, true),
     SHOULD_REINDEX_UNCHANGED_RECORDS(ConfigMethods::fillBool, false),
     MARC_FOLDER(ConfigMethods::fillSimpleString, false),
-    MARC_PROPERTIES(ConfigMethods::fillSimpleString, true)
+    MARC_PROPERTIES(ConfigMethods::fillSimpleString, true),
+    CALL_NUMBER_SUBFIELD(ConfigMethods::fillSimpleString, false),
+    ITEM_TAG(ConfigMethods::fillSimpleString, false),
+    LOCATION_SUBFIELD(ConfigMethods::fillSimpleString, false),
+    REMOVE_RECORDS_NOT_IN_MARC_EXPORT(ConfigMethods::fillBool, false)
     ;
 
     final private Function fillFunction;

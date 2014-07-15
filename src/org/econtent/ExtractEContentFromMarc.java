@@ -17,11 +17,7 @@ import org.econtent.GutenbergItemInfo;
 import org.ini4j.Ini;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.vufind.MarcRecordDetails;
-import org.vufind.IMarcRecordProcessor;
-import org.vufind.IRecordProcessor;
-import org.vufind.MarcProcessor;
-import org.vufind.Util;
+import org.vufind.*;
 
 import au.com.bytecode.opencsv.CSVReader;
 import org.vufind.config.Config;
@@ -38,7 +34,7 @@ import org.vufind.config.DynamicConfig;
 public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordProcessor {
     final static Logger logger = LoggerFactory.getLogger(ExtractEContentFromMarc.class);
 
-    private Config config = null;
+    private DynamicConfig config = null;
 
 	private boolean reindexUnchangedRecords;
 	private boolean checkOverDriveAvailability;
@@ -68,19 +64,10 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 	private PreparedStatement createActiveEContentRecord;
 	;
 	
-	public boolean init(Config config) {
+	public boolean init(DynamicConfig config) {
 		this.config = config;
 
-
-
-
-        Connection econtentConn = null;
-        try {
-            econtentConn = config.getEcontentDatasource().getConnection();
-        } catch (SQLException e) {
-            logger.error("Couldn't get a connection in ExtractEConentFromMarc", e);
-            return false;
-        }
+        Connection econtentConn = ConnectionProvider.getConnection(config, ConnectionProvider.PrintOrEContent.E_CONTENT);
 
         try {
 			//Connect to the vufind database
@@ -573,11 +560,6 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 		return true;
 		
 	}
-
-    @Override
-    public boolean init(DynamicConfig config) {
-        return false;
-    }
 
     @Override
 	public void finish() {
