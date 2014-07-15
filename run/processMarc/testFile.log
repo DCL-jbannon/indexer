@@ -1,0 +1,75 @@
+6181 [main] INFO  org.vufind.MarcProcessor - Loading marc properties
+7807 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/collection_group_map.properties
+7826 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: collection_group_map.properties
+7857 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/format_map.properties
+7871 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: format_map.properties
+7892 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/callnumber_map.properties
+7897 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: callnumber_map.properties
+7915 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/target_audience_map.properties
+7918 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: target_audience_map.properties
+7945 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/ddc22_map.properties
+8066 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: ddc22_map.properties
+8111 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/literary_form_map.properties
+8114 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: literary_form_map.properties
+8138 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/ddc22_map.properties
+8210 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: ddc22_map.properties
+8265 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/language_map.properties
+8299 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: language_map.properties
+8341 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/format_boost_map.properties
+8346 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: format_boost_map.properties
+8363 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/ddc22_map.properties
+8431 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: ddc22_map.properties
+8601 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/location_map.properties
+8602 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: location_map.properties
+8609 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/target_audience_full_map.properties
+8613 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: target_audience_full_map.properties
+8629 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/language_boost_es_map.properties
+8652 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: language_boost_es_map.properties
+8720 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/language_boost_map.properties
+8758 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: language_boost_map.properties
+8820 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/literary_form_full_map.properties
+8825 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: literary_form_full_map.properties
+8842 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/callnumber_subject_map.properties
+8866 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: callnumber_subject_map.properties
+8893 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/format_category_map.properties
+8913 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: format_category_map.properties
+8958 [main] INFO  org.vufind.MarcProcessor - Loading existing checksums for records
+2592 [main] INFO  org.vufind.MarcProcessor - Loading marc properties
+3420 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/collection_group_map.properties
+3426 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: collection_group_map.properties
+3427 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/format_map.properties
+3435 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: format_map.properties
+3442 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/callnumber_map.properties
+3442 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: callnumber_map.properties
+3453 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/target_audience_map.properties
+3456 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: target_audience_map.properties
+3466 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/ddc22_map.properties
+3491 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: ddc22_map.properties
+3496 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/literary_form_map.properties
+3499 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: literary_form_map.properties
+3513 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/ddc22_map.properties
+3533 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: ddc22_map.properties
+3542 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/language_map.properties
+3543 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: language_map.properties
+3554 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/format_boost_map.properties
+3555 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: format_boost_map.properties
+3557 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/ddc22_map.properties
+3575 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: ddc22_map.properties
+3601 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/location_map.properties
+3602 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: location_map.properties
+3604 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/target_audience_full_map.properties
+3604 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: target_audience_full_map.properties
+3604 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/language_boost_es_map.properties
+3612 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: language_boost_es_map.properties
+3620 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/language_boost_map.properties
+3625 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: language_boost_map.properties
+3635 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/literary_form_full_map.properties
+3636 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: literary_form_full_map.properties
+3643 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/callnumber_subject_map.properties
+3651 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: callnumber_subject_map.properties
+3655 [main] DEBUG org.solrmarc.tools.Utils - Opening file: /home/jbannon/IdeaProjects/indexer/run/processMarc/translation_maps/format_category_map.properties
+3655 [main] DEBUG org.vufind.MarcProcessor - Loading Custom Map: format_category_map.properties
+3658 [main] INFO  org.vufind.MarcProcessor - Loading existing checksums for records
+14696 [main] INFO  org.vufind.MarcProcessor - Loading ils ids for econtent records for suppression
+15297 [main] INFO  org.vufind.MarcProcessor - Loading record detection settings
+15391 [main] INFO  org.vufind.MarcProcessor - Loading ratings
