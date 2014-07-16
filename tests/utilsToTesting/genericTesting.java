@@ -6,10 +6,9 @@ import java.sql.SQLException;
 import java.util.Iterator;
 
 import org.API.OverDrive.IOverDriveAPIServices;
-import org.API.OverDrive.OverDriveAPI;
 import org.API.OverDrive.OverDriveAPIServices;
 import org.API.OverDrive.OverDriveCollectionIterator;
-import org.econtent.PopulateSolrOverDriveAPIItems;
+import org.vufind.econtent.PopulateSolrOverDriveAPIItems;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.junit.Test;

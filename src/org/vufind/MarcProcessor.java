@@ -3,7 +3,7 @@ package org.vufind;
 import bsh.EvalError;
 import bsh.Interpreter;
 import org.dcl.utils.ActiveEcontentUtils;
-import org.econtent.DetectionSettings;
+import org.vufind.econtent.DetectionSettings;
 import org.marc4j.marc.Record;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +11,7 @@ import org.solrmarc.tools.Utils;
 import org.vufind.config.DynamicConfig;
 import org.vufind.config.sections.BasicConfigOptions;
 import org.vufind.config.sections.MarcConfigOptions;
+import org.vufind.processors.IMarcRecordProcessor;
 
 import java.io.*;
 import java.lang.reflect.Method;
@@ -519,7 +520,7 @@ public class MarcProcessor {
 		return basicInfo;
 	}
 
-	protected boolean processMarcFiles(final ArrayList<IMarcRecordProcessor> recordProcessors, final Logger logger) 
+	protected boolean processMarcFiles(final ArrayList<IMarcRecordProcessor> recordProcessors, final Logger logger)
 	{
 		
 		try {

@@ -1,28 +1,23 @@
-package org.econtent;
+package org.vufind.econtent;
 
 import static org.junit.Assert.*;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Iterator;
+
 import mother.OverDriveAPIResultsMother;
 import mother.SolrInputDocumentMother;
 
 import org.API.OverDrive.IOverDriveAPIServices;
 import org.API.OverDrive.IOverDriveAPIUtils;
 import org.API.OverDrive.IOverDriveCollectionIterator;
-import org.API.OverDrive.OverDriveAPIUtils;
-import org.API.OverDrive.OverDriveCollectionIterator;
-import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.common.util.NamedList;
 import org.json.simple.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.solr.ISolrUtils;
 import org.solr.ISolrWrapper;
-import org.solr.SolrWrapper;
 import db.IDBeContentRecordServices;
 import dbTests.DBeContentRecordServicesTests;
 

@@ -4,8 +4,7 @@ package Suite;
  * http://www.mkyong.com/unittest/junit-4-tutorial-5-suite-test/
  */
 
-import org.dcl.utils.ActiveEcontentUtils;
-import org.econtent.PopulateSolrOverDriveAPIItemsTests;
+import org.vufind.econtent.PopulateSolrOverDriveAPIItemsTests;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
 import dbTests.DBeContentRecordServicesTests;

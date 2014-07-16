@@ -1,4 +1,4 @@
-package org.econtent;
+package org.vufind.econtent;
 
 import java.sql.SQLException;
 import java.util.ArrayList;

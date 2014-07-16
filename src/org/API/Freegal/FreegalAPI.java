@@ -10,8 +10,8 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import org.econtent.Album;
-import org.econtent.Song;
+import org.vufind.econtent.Album;
+import org.vufind.econtent.Song;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vufind.Base64Coder;

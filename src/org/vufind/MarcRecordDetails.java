@@ -26,8 +26,8 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.TransformerException;
 
 import org.apache.solr.common.SolrInputDocument;
-import org.econtent.DetectionSettings;
-import org.econtent.LibrarySpecificLink;
+import org.vufind.econtent.DetectionSettings;
+import org.vufind.econtent.LibrarySpecificLink;
 import org.marc4j.MarcStreamWriter;
 import org.marc4j.MarcWriter;
 import org.marc4j.MarcXmlWriter;

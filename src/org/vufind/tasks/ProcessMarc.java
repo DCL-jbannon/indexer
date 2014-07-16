@@ -2,11 +2,9 @@ package org.vufind.tasks;
 
 import org.marc4j.MarcPermissiveStreamReader;
 import org.marc4j.MarcReader;
-import org.marc4j.MarcStreamReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.vufind.IMarcRecordProcessor;
-import org.vufind.IRecordProcessor;
+import org.vufind.processors.IMarcRecordProcessor;
 import org.vufind.MarcProcessor;
 import org.vufind.MarcRecordDetails;
 import org.vufind.config.ConfigFiller;
@@ -17,7 +15,10 @@ import org.vufind.config.sections.MarcConfigOptions;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 
 /**
  * Created by jbannon on 7/3/14.
@@ -52,8 +53,29 @@ public class ProcessMarc {
         this.marcProcessor.init(this.config);
     }
 
+    public static class CountingList<E> extends ArrayList<E> {
+        private int count = 0;
+
+        public void increment() {
+            count++;
+        }
+
+        public int getCount() {
+            return count;
+        }
+
+        public CountingList(Collection c) {
+            super(c);
+            this.count = 0;
+        }
+    }
+
     public void run(String indexName) {
         List<IMarcRecordProcessor> recordProcessors = loadRecordProcessors();
+
+        //We use our own ForkJoinPool rather than allowing parallelStream() to select the default, largely this
+        //is to see greater dependability in testing as the default pool will only have one thread on some machines.
+        ForkJoinPool forkJoinPool = new ForkJoinPool(3);
 
         List<File> marcFiles = getMarcFiles();
         for(File marcFile : marcFiles) {
@@ -63,8 +85,37 @@ public class ProcessMarc {
 
             List<MarcRecordDetails> records = null;
             while((records = getNextRecords(reader, 1000)).size()>0) {
-                final List<MarcRecordDetails> closedOverRecords = records;
-                recordProcessors.parallelStream().forEach((processor) -> processor.accept(closedOverRecords));
+                final CountingList<MarcRecordDetails> closedOverRecords = new CountingList(records);
+
+                System.out.println("------------------------\nAfter getting records");
+                /* Total amount of free memory available to the JVM */
+                System.out.println("Free memory (bytes): " +
+                        Runtime.getRuntime().freeMemory());
+                /* This will return Long.MAX_VALUE if there is no preset limit */
+                long maxMemory = Runtime.getRuntime().maxMemory();
+                /* Maximum amount of memory the JVM will attempt to use */
+                System.out.println("Maximum memory (bytes): " +
+                        (maxMemory == Long.MAX_VALUE ? "no limit" : maxMemory));
+
+                long start = System.nanoTime();
+
+                ForkJoinTask task = forkJoinPool.submit(()->
+                    recordProcessors.parallelStream().forEach((processor) -> processor.accept(closedOverRecords)));
+                task.join();
+
+                System.out.println("------------------------\nAfter processing");
+                System.out.println("Count: "+closedOverRecords.getCount());
+                long elapsedTime = System.nanoTime() - start;
+                System.out.println("Time: "+(elapsedTime/1000.0/1000.0/1000.0));
+                /* Total amount of free memory available to the JVM */
+                System.out.println("Free memory (bytes): " +
+                        Runtime.getRuntime().freeMemory());
+                /* This will return Long.MAX_VALUE if there is no preset limit */
+                maxMemory = Runtime.getRuntime().maxMemory();
+                /* Maximum amount of memory the JVM will attempt to use */
+                System.out.println("Maximum memory (bytes): " +
+                        (maxMemory == Long.MAX_VALUE ? "no limit" : maxMemory));
+                break;//Just temporary for profiling purposes
             }
         }
 

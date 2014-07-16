@@ -2,7 +2,7 @@ package org.vufind.config;
 
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.solr.client.solrj.impl.ConcurrentUpdateSolrServer;
-import org.econtent.EContentRecordDAO;
+import org.vufind.econtent.EContentRecordDAO;
 import org.ini4j.Ini;
 import org.ini4j.InvalidFileFormatException;
 import org.slf4j.Logger;

@@ -10,18 +10,19 @@ import java.util.ArrayList;
 import org.API.OverDrive.OverDriveAPIServices;
 import org.API.OverDrive.OverDriveCollectionIterator;
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.econtent.EContentIndexer;
-import org.econtent.EContentRecordDAO;
-import org.econtent.ExtractEContentFromMarc;
-import org.econtent.FreegalImporter;
-import org.econtent.PopulateOverDriveAPIItems;
+import org.vufind.processors.EContentIndexer;
+import org.vufind.econtent.EContentRecordDAO;
+import org.vufind.processors.ExtractEContentFromMarc;
+import org.vufind.econtent.FreegalImporter;
+import org.vufind.econtent.PopulateOverDriveAPIItems;
 import org.ini4j.Ini;
 import org.ini4j.InvalidFileFormatException;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.strands.StrandsProcessor;
+import org.vufind.processors.StrandsProcessor;
 import org.vufind.config.Config;
+import org.vufind.processors.*;
 
 /**
  * Runs the nightly reindex process to update solr index based on the latest
