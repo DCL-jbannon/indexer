@@ -5,7 +5,6 @@ package dbTests;
 
 import static org.junit.Assert.*;
 
-import java.io.FileInputStream;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -27,7 +26,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
-import db.DBeContentRecordServices;
+import org.vufind.econtent.db.DBeContentRecordServices;
 
 @RunWith(Parameterized.class)
 public class DBeContentRecordServicesTests extends BaseDBEcontentTests

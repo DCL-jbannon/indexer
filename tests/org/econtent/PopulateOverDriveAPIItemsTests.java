@@ -11,7 +11,7 @@ import org.json.simple.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
-import db.IDBeContentRecordServices;
+import org.vufind.econtent.db.IDBeContentRecordServices;
 
 public class PopulateOverDriveAPIItemsTests {
 	

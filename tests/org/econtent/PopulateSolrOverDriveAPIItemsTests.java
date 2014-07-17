@@ -18,7 +18,7 @@ import org.junit.Test;
 import org.mockito.Mockito;
 import org.solr.ISolrUtils;
 import org.solr.ISolrWrapper;
-import db.IDBeContentRecordServices;
+import org.vufind.econtent.db.IDBeContentRecordServices;
 import dbTests.DBeContentRecordServicesTests;
 
 public class PopulateSolrOverDriveAPIItemsTests {

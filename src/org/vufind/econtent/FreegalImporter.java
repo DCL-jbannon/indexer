@@ -1,24 +1,28 @@
 package org.vufind.econtent;
 
 import java.io.IOException;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.*;
 
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.API.Freegal.FreegalAPI;
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.vufind.ConnectionProvider;
 import org.vufind.config.Config;
+import org.vufind.config.sections.FreegalConfigOptions;
 import org.vufind.processors.IRecordProcessor;
 import org.vufind.config.DynamicConfig;
 import org.xml.sax.SAXException;
 
-public class FreegalImporter implements IRecordProcessor {
+public class FreegalImporter implements IRecordProcessor, I_ExternalImporter {
     final static Logger logger = LoggerFactory.getLogger(FreegalImporter.class);
 
-	private Config config = null;
-
+	private DynamicConfig config = null;
+    private EContentRecordDAO eContentRecordDAO = null;
 	private FreegalAPI freegalAPI;
 	private EContentRecordDAO dao;
 
@@ -33,7 +37,7 @@ public class FreegalImporter implements IRecordProcessor {
         }
 
 		try {
-			EContentRecordDAO dao = config.getEContentRecordDAO();
+			EContentRecordDAO dao = this.eContentRecordDAO;
 			Collection<String> genres = freegalAPI.getAllGenres();
             logger.info("Freegal Gender Number: " + genres.size());
             int songsAdded = 0;
@@ -73,7 +77,7 @@ public class FreegalImporter implements IRecordProcessor {
             boolean added = false;
             if (record == null) {
                 // create new record
-                record = new EContentRecord(config.getEContentRecordDAO());
+                record = new EContentRecord(this.eContentRecordDAO);
                 record.set("date_added",
                         (int) (new Date().getTime() / 100));
                 record.set("addedBy", -1);
@@ -133,18 +137,18 @@ public class FreegalImporter implements IRecordProcessor {
 	public FreegalImporter() {
 	}
 
-
-    public boolean init(Config config) {
-        this.config = config;
-
-        this.freegalAPI = new FreegalAPI(config.getFreegalUrl(), config.getFreegalUser(), config.getFreegalPIN(),
-                config.getFreegalAPIkey(), config.getFreegalLibraryId());
-        return true;
-    }
-
-    @Override
     public boolean init(DynamicConfig config) {
-        return false;
+        this.config = config;
+        BasicDataSource econtentDataSource = ConnectionProvider.getDataSource(config, ConnectionProvider.PrintOrEContent.E_CONTENT);
+        this.eContentRecordDAO = new EContentRecordDAO(econtentDataSource);
+        this.freegalAPI = new FreegalAPI(
+                config.getString(FreegalConfigOptions.URL),
+                config.getString(FreegalConfigOptions.USER),
+                config.getString(FreegalConfigOptions.PIN),
+                config.getString(FreegalConfigOptions.API_KEY),
+                config.getString(FreegalConfigOptions.LIBRARY_ID));
+
+        return true;
     }
 
     @Override

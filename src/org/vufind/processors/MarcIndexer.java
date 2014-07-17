@@ -27,18 +27,15 @@ public class MarcIndexer implements IMarcRecordProcessor {
 
     }
 
-    private ConcurrentUpdateSolrServer solr = null;
     private ConcurrentUpdateSolrServer getSolrUpdator() {
-        if(solr==null) {
-            solr = SolrUpdateServerFactory.getSolrUpdateServer(
-                    config.get(BasicConfigOptions.BASE_SOLR_URL).toString()
-                            + config.get(BasicConfigOptions.PRINT_CORE).toString());
-        }
-        return solr;
+        return SolrUpdateServerFactory.getSolrUpdateServer(config.get(BasicConfigOptions.BASE_SOLR_URL).toString()
+                + config.get(BasicConfigOptions.PRINT_CORE).toString());
     }
 
     @Override
 	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
+        logger.info("Processing record: "+recordInfo.getId());
+
 		try {
             MarcProcessor.RecordStatus recordStatus = recordInfo.getRecordStatus();
 			if (recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED
@@ -56,9 +53,11 @@ public class MarcIndexer implements IMarcRecordProcessor {
 				try {
 					SolrInputDocument doc = recordInfo.getSolrDocument();
 					if (doc != null){
-                        if(doc.getField("id")==null) {
+                        if(doc.getField("id")==null || doc.getField("id").equals("")) {
                             int i = 0;
                             i++;
+                            logger.error("Solr Document didn't have an ID. Aborting add.");
+                            return false;
                         }
                         getSolrUpdator().add(doc);
                         logger.debug("Added record[" + recordInfo.getId() + "]");

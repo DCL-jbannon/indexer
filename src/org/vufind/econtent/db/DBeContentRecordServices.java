@@ -1,4 +1,4 @@
-package db;
+package org.vufind.econtent.db;
 
 import java.sql.Connection;
 import java.sql.ResultSet;

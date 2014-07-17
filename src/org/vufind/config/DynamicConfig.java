@@ -27,6 +27,10 @@ public class DynamicConfig {
         return (boolean)values.get(option);
     }
 
+    public Integer getInteger(I_ConfigOption option) {
+        return (Integer)values.get(option);
+    }
+
     public List getList(I_ConfigOption option) {
         return (List) values.get(option);
     }

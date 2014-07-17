@@ -13,6 +13,10 @@ public class ConfigMethods {
         return o;
     }
 
+    public static Object fillInteger(Object o) {
+        return Integer.parseInt(o.toString());
+    }
+
     public static Object fillClass(Object o) {
         try {
             if(o instanceof String) {

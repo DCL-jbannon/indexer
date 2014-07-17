@@ -1,5 +1,7 @@
 package org.vufind.tasks;
 
+import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.impl.ConcurrentUpdateSolrServer;
 import org.marc4j.MarcPermissiveStreamReader;
 import org.marc4j.MarcReader;
 import org.slf4j.Logger;
@@ -11,12 +13,10 @@ import org.vufind.config.ConfigFiller;
 import org.vufind.config.DynamicConfig;
 import org.vufind.config.sections.BasicConfigOptions;
 import org.vufind.config.sections.MarcConfigOptions;
+import org.vufind.solr.SolrUpdateServerFactory;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 
@@ -71,11 +71,24 @@ public class ProcessMarc {
     }
 
     public void run(String indexName) {
+        File runLog = new File("runLog.log");
+        FileWriter runLogW = null;
+        try {
+            runLogW = new FileWriter(runLog, false);
+            runLogW.write("Start Time: "+System.nanoTime()+"\n");
+            runLogW.flush();
+            runLogW.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        long processStartTime = System.nanoTime();
+
         List<IMarcRecordProcessor> recordProcessors = loadRecordProcessors();
 
         //We use our own ForkJoinPool rather than allowing parallelStream() to select the default, largely this
         //is to see greater dependability in testing as the default pool will only have one thread on some machines.
-        ForkJoinPool forkJoinPool = new ForkJoinPool(3);
+        ForkJoinPool forkJoinPool = new ForkJoinPool(recordProcessors.size());
 
         List<File> marcFiles = getMarcFiles();
         for(File marcFile : marcFiles) {
@@ -103,9 +116,24 @@ public class ProcessMarc {
                     recordProcessors.parallelStream().forEach((processor) -> processor.accept(closedOverRecords)));
                 task.join();
 
+                System.out.println("------------------------\nAbout to wait() for Solr updater");
+                long elapsedTime = System.nanoTime() - start;
+                System.out.println("Time: "+(elapsedTime/1000.0/1000.0/1000.0));
+
+                ConcurrentUpdateSolrServer solr = SolrUpdateServerFactory.getSolrUpdateServer(config.get(BasicConfigOptions.BASE_SOLR_URL).toString()
+                        + config.get(BasicConfigOptions.PRINT_CORE).toString())          ;
+                solr.blockUntilFinished();
+                try {
+                    solr.commit();
+                } catch (SolrServerException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
                 System.out.println("------------------------\nAfter processing");
                 System.out.println("Count: "+closedOverRecords.getCount());
-                long elapsedTime = System.nanoTime() - start;
+                elapsedTime = System.nanoTime() - start;
                 System.out.println("Time: "+(elapsedTime/1000.0/1000.0/1000.0));
                 /* Total amount of free memory available to the JVM */
                 System.out.println("Free memory (bytes): " +
@@ -115,20 +143,34 @@ public class ProcessMarc {
                 /* Maximum amount of memory the JVM will attempt to use */
                 System.out.println("Maximum memory (bytes): " +
                         (maxMemory == Long.MAX_VALUE ? "no limit" : maxMemory));
-                break;//Just temporary for profiling purposes
+                //break;//Just temporary for profiling purposes
             }
         }
 
         for (IMarcRecordProcessor processor : recordProcessors) {
             processor.finish();
         }
+
+        long processEndTime = System.nanoTime();
+        try {
+            runLogW = new FileWriter(runLog, true);
+            runLogW.write("End Time: "+processEndTime+"\n");
+            runLogW.write("Total Minutes: "+((processEndTime-processStartTime)/1000.0/1000.0/1000.0/60.0)+"\n");
+            runLogW.flush();
+            runLogW.close();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+
     }
 
     private List<File> getMarcFiles() {
         File marcRecordDirectory = new File(config.get(MarcConfigOptions.MARC_FOLDER).toString());
-        List<File> marcFiles = null;
+        File[] marcFiles = null;
         if (marcRecordDirectory.isDirectory()) {
-            marcFiles = Arrays.asList(marcRecordDirectory.listFiles(new FilenameFilter() {
+            marcFiles = marcRecordDirectory.listFiles(new FilenameFilter() {
                 @Override
                 public boolean accept(File dir, String name) {
                     if (name.matches("(?i).*?\\.(marc|mrc)")) {
@@ -137,12 +179,19 @@ public class ProcessMarc {
                         return false;
                     }
                 }
-            }));
+            });
+            Arrays.sort(marcFiles, new Comparator<File>() {
+                        @Override
+                        public int compare(File file1, File file2) {
+                            return file1.getName().compareTo(file2.getName());
+                        }
+                    }
+            );
         } else {
-            marcFiles = Arrays.asList(new File[] { marcRecordDirectory });
+            marcFiles = new File[] { marcRecordDirectory };
         }
 
-        return marcFiles;
+        return Arrays.asList(marcFiles);
     }
 
     private List<MarcRecordDetails> getNextRecords(MarcReader reader, int limit) {

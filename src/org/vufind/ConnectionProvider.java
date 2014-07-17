@@ -19,6 +19,15 @@ public class ConnectionProvider {
     }
 
     static final Hashtable<PrintOrEContent, BasicDataSource> dataSourceHashtable = new Hashtable();
+
+    public static BasicDataSource getDataSource(DynamicConfig config, PrintOrEContent printOrEContent) {
+        if(dataSourceHashtable.isEmpty()) {
+            loadDataSources(config);
+        }
+
+        return dataSourceHashtable.get(printOrEContent);
+    }
+
     public static Connection getConnection(DynamicConfig config, PrintOrEContent printOrEContent) {
         if(dataSourceHashtable.isEmpty()) {
             loadDataSources(config);

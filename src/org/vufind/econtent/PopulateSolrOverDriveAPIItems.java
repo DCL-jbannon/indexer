@@ -17,8 +17,8 @@ import org.solr.ISolrUtils;
 import org.solr.ISolrWrapper;
 import org.solr.SolrUtils;
 
-import db.DBeContentRecordServices;
-import db.IDBeContentRecordServices;
+import org.vufind.econtent.db.DBeContentRecordServices;
+import org.vufind.econtent.db.IDBeContentRecordServices;
 
 public class PopulateSolrOverDriveAPIItems
 {

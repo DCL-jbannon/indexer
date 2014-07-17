@@ -6,8 +6,8 @@ import org.API.OverDrive.IOverDriveAPIServices;
 import org.API.OverDrive.IOverDriveCollectionIterator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
-import db.DBeContentRecordServices;
-import db.IDBeContentRecordServices;
+import org.vufind.econtent.db.DBeContentRecordServices;
+import org.vufind.econtent.db.IDBeContentRecordServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

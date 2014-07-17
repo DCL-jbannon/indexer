@@ -257,6 +257,7 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 	}
 
 	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
+        logger.info("Processing record: "+recordInfo.getId());
 		Long resourceId = -1L;
 		
 		boolean updateSubjectAndCallNumber = true;

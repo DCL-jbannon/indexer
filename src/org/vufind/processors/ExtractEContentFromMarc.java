@@ -104,6 +104,8 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 
 	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
 		try {
+            logger.info("Processing record: "+recordInfo.getId());
+
 			//Check the 856 tag to see if this is a source that we can handle.
 			if (!recordInfo.isEContent()){
 				logger.debug("Skipping record, it is not eContent");

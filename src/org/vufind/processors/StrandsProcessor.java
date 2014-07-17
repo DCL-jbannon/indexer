@@ -152,6 +152,7 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 
 	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
 		try {
+            logger.info("Processing record: "+recordInfo.getId());
 
             if(recordInfo.getRecordStatus() == MarcProcessor.RecordStatus.RECORD_DELETED) {
                 return true;
@@ -160,6 +161,11 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
             // Write the id
             ContentBean content = new ContentBean();
 
+            String id = recordInfo.getId();
+            if(id.equals("151")) {
+                int i = 0;
+                i++;
+            }
             logger.info("Processing record: "+recordInfo.getId());
             content.setId(recordInfo.getId());
 

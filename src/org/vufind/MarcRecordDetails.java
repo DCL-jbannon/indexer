@@ -6,16 +6,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -56,14 +47,15 @@ public class MarcRecordDetails {
     private MarcProcessor marcProcessor;
 
     private Record record;
-    private HashMap<String, Object> mappedFields = new HashMap<String, Object>();
+    private String id = null;
+
+    private Map<String, Object> mappedFields = null;
+    private boolean finishedMappingFields = false;
 
     private ArrayList<LibrarySpecificLink> sourceUrls = new ArrayList<LibrarySpecificLink>();
     private String purchaseUrl;
     private boolean urlsLoaded;
     private long checksum = -1;
-
-    private boolean allFieldsMapped = false;
 
     private MarcProcessor.RecordStatus recordStatus = MarcProcessor.RecordStatus.RECORD_UNCHANGED;
 
@@ -81,7 +73,8 @@ public class MarcRecordDetails {
 
 		// Map the id field
 		String fieldVal[] = marcProcessor.getMarcFieldProps().get("id");
-		mapField("id", fieldVal);
+        this.mappedFields = new HashMap<String, Object>();
+		mapField("id", fieldVal, this.mappedFields);
 	}
 
     public void setRecordStatus(MarcProcessor.RecordStatus recordStatus) {
@@ -97,22 +90,37 @@ public class MarcRecordDetails {
 	 * 
 	 * @return
 	 */
-	private boolean mapRecord(String source) {
-		if (allFieldsMapped) return true;
+	private boolean mapRecord() {
+		if (this.finishedMappingFields){
+            return true;
+        }
 		//logger.debug("Mapping record " + getId() + " " + source);
-		allFieldsMapped = true;
+        synchronized (this) {
+            if (this.finishedMappingFields){
+                return true;
+            }
 
-		// Map all fields for the record
-		for (String fieldName : marcProcessor.getMarcFieldProps().keySet()) {
-			String fieldVal[] = marcProcessor.getMarcFieldProps().get(fieldName);
-			mapField(fieldName, fieldVal);
-		}
+            HashMap<String, Object> mappedFields = new HashMap<String, Object>();
+            mappedFields.putAll(this.mappedFields);
+            HashMap<String, String[]> props = marcProcessor.getMarcFieldProps();
+            //Map the id field
+            String fieldVal[] = props.get("id");
+            mapField("id", fieldVal, mappedFields);
 
-		return true;
+            // Map all fields for the record
+            for (String fieldName : props.keySet()) {
+                fieldVal = props.get(fieldName);
+                mapField(fieldName, fieldVal, mappedFields);
+            }
+
+            this.mappedFields = Collections.unmodifiableMap(mappedFields);
+            this.finishedMappingFields = true;
+        }
+        return true;
 	}
 
-	private void mapField(String fieldName, String[] fieldVal) {
-		String indexField = fieldVal[0];
+	private void mapField(String fieldName, String[] fieldVal, Map<String, Object> mappedFields) {
+        String indexField = fieldVal[0];
 		String indexType = fieldVal[1];
 		String indexParm = fieldVal[2];
 		String mapName = fieldVal[3];
@@ -631,9 +639,7 @@ public class MarcRecordDetails {
 	/**
 	 * Get the specified subfields from the specified MARC field, returned as a
 	 * set of strings to become lucene document field values
-	 * 
-	 * @param record
-	 *          - the marc record object
+	 *
 	 * @param fldTag
 	 *          - the field name, e.g. 245
 	 * @param subfldsStr
@@ -641,11 +647,10 @@ public class MarcRecordDetails {
 	 * @param separator
 	 *          - the separator string to insert between subfield items (if null,
 	 *          a " " will be used)
-	 * @returns a Set of String, where each string is the concatenated contents of
+	 * @return a Set of String, where each string is the concatenated contents of
 	 *          all the desired subfield values from a single instance of the
 	 *          fldTag
 	 */
-	@SuppressWarnings("unchecked")
 	protected Set<String> getSubfieldDataAsSet(String fldTag, String subfldsStr, String separator) {
 		Set<String> resultSet = new LinkedHashSet<String>();
 
@@ -697,7 +702,7 @@ public class MarcRecordDetails {
 	 *          - the marc record object
 	 * @param fldTag
 	 *          - the field name, e.g. 008
-	 * @param subfld
+	 * @param subfield
 	 *          - the string containing the desired subfields
 	 * @param beginIx
 	 *          - the beginning index of the substring of the subfield value
@@ -928,9 +933,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Return the date in 260c as a string
-	 * 
-	 * @param record
-	 *          - the marc record object
+	 *
 	 * @return 260c, "cleaned" per org.solrmarc.tools.Utils.cleanDate()
 	 */
 	public String getDate() {
@@ -998,7 +1001,11 @@ public class MarcRecordDetails {
 			throws SolrMarcIndexerException {
 		Object retval = null;
 		Class<?> returnType = null;
-		String id = this.getId();
+        Object o = indexMap.get("id");
+		String id = "";
+        if(o instanceof String) {
+            id = (String)o;
+        }
 
 		Class<?> classThatContainsMethod = this.getClass();
 		Object objectThatContainsMethod = this;
@@ -1200,8 +1207,7 @@ public class MarcRecordDetails {
 	 * Get the 245a (and 245b, if it exists, concatenated with a space between the
 	 * two subfield values), with trailing punctuation removed. See
 	 * org.solrmarc.tools.Utils.cleanData() for details on the punctuation removal
-	 * 
-	 * @param record
+	 *
 	 *          - the marc record object
 	 * @return 245a, b, and k values concatenated in order found, with trailing
 	 *         punct removed. Returns empty string if no suitable title found.
@@ -1234,8 +1240,7 @@ public class MarcRecordDetails {
 	 * @return 245a and 245b values concatenated, with trailing punct removed, and
 	 *         with non-filing characters omitted. Null returned if no title can
 	 *         be found.
-	 * 
-	 * @see org.solrmarc.index.SolrIndexer.getTitle()
+	 * s
 	 */
 	public String getSortableTitle() {
 		DataField titleField = (DataField) record.getVariableField("245");
@@ -1288,6 +1293,9 @@ public class MarcRecordDetails {
 
 	public String getShortId() {
 		String shortId = getId();
+        if(shortId==null) {
+            return null;
+        }
 		if (shortId.startsWith(".b") && shortId.length() == 10) {
 			// Millennium id, trim off the leading . and the trailing checksum digit
 			shortId = shortId.substring(1, 9);
@@ -1327,8 +1335,8 @@ public class MarcRecordDetails {
 		}
 	}
 
-	private HashMap<String, Object> getMappedFields(String source) {
-		mapRecord(source);
+	private Map<String, Object> getMappedFields(String source) {
+		mapRecord();
 		return mappedFields;
 	}
 
@@ -1354,11 +1362,12 @@ public class MarcRecordDetails {
 		return (String) getMappedFields("title_sort").get("title_sort");
 	}
 
-	private HashMap<String, Object> getFields(String source) {
+	private Map<String, Object> getFields(String source) {
 		return getMappedFields(source);
 	}
 	
 	public Object getMappedField(String fieldName){
+        mapRecord();
 		return getMappedFields(fieldName).get(fieldName);
 	}
 
@@ -2362,9 +2371,7 @@ public class MarcRecordDetails {
 
 	/**
 	 * Determine the number of items for the record
-	 * 
-	 * @param Record
-	 *          record
+	 *
 	 * @return Set format of record
 	 */
 	public String getNumHoldings(String itemField) {
@@ -2646,8 +2653,7 @@ public class MarcRecordDetails {
 	 * Extract a numeric portion of the Dewey decimal call number
 	 * 
 	 * Can return null
-	 * 
-	 * @param record
+	 *
 	 * @param fieldSpec
 	 *          - which MARC fields / subfields need to be analyzed
 	 * @param precisionStr
@@ -2951,7 +2957,7 @@ public class MarcRecordDetails {
 	public String createXmlDoc() throws ParserConfigurationException, FactoryConfigurationError, TransformerException { 
 		XMLBuilder builder = XMLBuilder.create("add");
 		XMLBuilder doc = builder.e("doc");
-		HashMap <String, Object> allFields = getFields("createXmlDoc");
+		Map <String, Object> allFields = getFields("createXmlDoc");
 		Iterator<String> keyIterator = allFields.keySet().iterator();
 		while (keyIterator.hasNext()){
 			String fieldName = keyIterator.next();
@@ -3004,7 +3010,7 @@ public class MarcRecordDetails {
 
 	public SolrInputDocument getSolrDocument() {
 		SolrInputDocument doc = new SolrInputDocument();
-		HashMap <String, Object> allFields = getFields("getSolrDocument");
+		Map <String, Object> allFields = getFields("getSolrDocument");
 		for (String fieldName : allFields.keySet()){
 			Object value = allFields.get(fieldName);
 			doc.addField(fieldName, value);
