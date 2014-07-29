@@ -1,5 +1,7 @@
 package org.vufind.tasks;
 
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.core.util.StatusPrinter;
 import org.apache.solr.client.solrj.impl.ConcurrentUpdateSolrServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,6 +9,7 @@ import org.vufind.URLPostResponse;
 import org.vufind.Util;
 import org.vufind.config.*;
 import org.vufind.config.sections.BasicConfigOptions;
+import org.vufind.config.sections.CoreSwapConfigOptions;
 import org.vufind.solr.SolrUpdateServerFactory;
 
 import java.io.File;
@@ -18,19 +21,26 @@ import java.util.function.Function;
  */
 public class SwapIndex {
     public static void main(String[] args) {
-        if (args.length < 3) {
+        StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
+        if (args.length < 1) {
             System.out
-                    .println("Please enter params: 1 - configFile, 2 - oldCore, 3 - newCore");
+                    .println("Please enter params: 1 - configFile");
             System.exit(-1);
         }
         String configFolder = args[0];
-        String oldCore = args[1];
-        String newCore = args[2];
 
         DynamicConfig config = new DynamicConfig();
         ConfigFiller.fill(config, Arrays.asList(BasicConfigOptions.values()), new File(configFolder));
+        ConfigFiller.fill(config, Arrays.asList(CoreSwapConfigOptions.values()), new File(configFolder));
 
         SwapIndex si = new SwapIndex(config);
+
+        String newCore = config.getString(CoreSwapConfigOptions.PRINT_NEW_CORE);
+        String oldCore = config.getString(CoreSwapConfigOptions.PRINT_OLD_CORE);
+        si.run(oldCore, newCore);
+
+        newCore = config.getString(CoreSwapConfigOptions.ECONTENT_NEW_CORE);
+        oldCore = config.getString(CoreSwapConfigOptions.ECONTENT_OLD_CORE);
         si.run(oldCore, newCore);
     }
 
@@ -51,7 +61,7 @@ public class SwapIndex {
             logger.error("Error optimizing index ["+newCore+"]", e);
         }
 
-        URLPostResponse response = Util.getURL(config.get(BasicConfigOptions.BASE_SOLR_URL)  + "/admin/cores?action=SWAP&core="+newCore+"&other="+oldCore, logger);
+        URLPostResponse response = Util.getURL(config.get(BasicConfigOptions.BASE_SOLR_URL)  + "admin/cores?action=SWAP&core="+newCore+"&other="+oldCore, logger);
         if (!response.isSuccess()){
             logger.error("Error swapping cores", response.getMessage());
             return false;

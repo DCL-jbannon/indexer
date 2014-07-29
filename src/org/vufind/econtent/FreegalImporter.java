@@ -1,45 +1,49 @@
 package org.vufind.econtent;
 
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.*;
-
-import javax.xml.parsers.ParserConfigurationException;
-
 import org.API.Freegal.FreegalAPI;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vufind.ConnectionProvider;
-import org.vufind.config.Config;
-import org.vufind.config.sections.FreegalConfigOptions;
-import org.vufind.processors.IRecordProcessor;
+import org.vufind.config.ConfigFiller;
 import org.vufind.config.DynamicConfig;
+import org.vufind.config.sections.BasicConfigOptions;
+import org.vufind.config.sections.FreegalConfigOptions;
 import org.xml.sax.SAXException;
 
-public class FreegalImporter implements IRecordProcessor, I_ExternalImporter {
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.File;
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashSet;
+
+public class FreegalImporter implements I_ExternalImporter {
     final static Logger logger = LoggerFactory.getLogger(FreegalImporter.class);
 
 	private DynamicConfig config = null;
     private EContentRecordDAO eContentRecordDAO = null;
 	private FreegalAPI freegalAPI;
-	private EContentRecordDAO dao;
 
 	public void importRecords() {
         logger.info("Importing Freegal API Items");
 
-        try {
-            dao.flagAllFreegalRecordsAsDeleted();
-        } catch (SQLException e) {
-            logger.error("Error flagging all Freegal records as \"deleted\".", e);
-            return;
-        }
-
 		try {
 			EContentRecordDAO dao = this.eContentRecordDAO;
-			Collection<String> genres = freegalAPI.getAllGenres();
-            logger.info("Freegal Gender Number: " + genres.size());
+
+            try {
+                dao.flagAllFreegalRecordsAsDeleted();
+            } catch (SQLException e) {
+                logger.error("Error flagging all Freegal records as \"deleted\".", e);
+                return;
+            }
+
+
+			Collection<String> genres = new HashSet<String>();
+            genres.addAll(freegalAPI.getAllGenres());
+            logger.info("Freegal Genre Number: " + genres.size());
             int songsAdded = 0;
 
             // Remove all existing songs for the album from the
@@ -55,11 +59,7 @@ public class FreegalImporter implements IRecordProcessor, I_ExternalImporter {
                     processAlbumPartition(partition);
                 }
 			}
-		} catch (ParserConfigurationException e) {
-            logger.error("Error downloading Freegal contents.", e);
-		} catch (SAXException e) {
-            logger.error("Error downloading Freegal contents.", e);
-		} catch (IOException e) {
+		} catch (ParserConfigurationException | SAXException | IOException e ) {
             logger.error("Error downloading Freegal contents.", e);
 		} catch (SQLException e) {
             logger.error("Error adding/updating Freegal records.", e);
@@ -69,10 +69,14 @@ public class FreegalImporter implements IRecordProcessor, I_ExternalImporter {
     private void syncEContentRecordsInDB(Collection<Album> albums) throws SQLException{
         for (Album album : albums) {
 
+            if(album.getTitle().startsWith("I'm Glad There Is You") || album.getTitle().startsWith("On Fire the album")) {
+                int ii = 0;
+                ii++;
+            }
             logger.info("Processing album " + album.getTitle()
                     + " the album has " + album.getSongs().size()
                     + " songs");
-            EContentRecord record = dao.findByTitleAndAuthor(
+            EContentRecord record = this.eContentRecordDAO.findByTitleAndAuthor(
                     album.getTitle(), album.getAuthor());
             boolean added = false;
             if (record == null) {
@@ -80,7 +84,6 @@ public class FreegalImporter implements IRecordProcessor, I_ExternalImporter {
                 record = new EContentRecord(this.eContentRecordDAO);
                 record.set("date_added",
                         (int) (new Date().getTime() / 100));
-                record.set("addedBy", -1);
                 record.set("accessType", "free");
                 record.set("source", "Freegal");
                 record.set("availableCopies", 1);
@@ -100,16 +103,37 @@ public class FreegalImporter implements IRecordProcessor, I_ExternalImporter {
             record.set("genre", album.getGenre());
             record.set("collection", album.getCollection());
             record.set("cover", album.getCoverUrl());
-            dao.save(record);
+
+            record.set("addedBy", -1);
+
+            try {
+                this.eContentRecordDAO.save(record);
+            } catch( Exception e) {
+                e.printStackTrace();
+            }
+
         }
     }
     private void processAlbumPartition(Collection<Album> albums) throws SQLException {
         int songsAdded = 0;
+        syncEContentRecordsInDB(albums);
         for (Album album : albums) {
-            syncEContentRecordsInDB(albums);
-            EContentRecord record = dao.findByTitleAndAuthor(
-                    album.getTitle(), album.getAuthor());
-            String recordId = record.get("id").toString();
+            EContentRecord record = null;
+            String recordId = null;
+            try {
+                record = this.eContentRecordDAO.findByTitleAndAuthor(
+                        album.getTitle(), album.getAuthor());
+                if(record != null && record.get("id") != null)   {
+                    recordId = record.get("id").toString();
+                } else {
+                    int ii = 0;
+                    ii++;
+                    continue;
+                }
+            } catch(Exception e) {
+                e.printStackTrace();
+                continue;
+            }
 
             // Add songs to the database
             for (Song song : album.getSongs()) {
@@ -128,16 +152,17 @@ public class FreegalImporter implements IRecordProcessor, I_ExternalImporter {
                         null,
                         (int) (new Date().getTime() / 100),
                         (int) (new Date().getTime() / 100));
-                dao.addEContentItem(item);
+                this.eContentRecordDAO.addEContentItem(item);
             }
         }
-        dao.flushEContentItems(false);
+        this.eContentRecordDAO.flushEContentItems(false);
     }
 
 	public FreegalImporter() {
 	}
 
     public boolean init(DynamicConfig config) {
+        ConfigFiller.fill(config, FreegalConfigOptions.values(), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
         this.config = config;
         BasicDataSource econtentDataSource = ConnectionProvider.getDataSource(config, ConnectionProvider.PrintOrEContent.E_CONTENT);
         this.eContentRecordDAO = new EContentRecordDAO(econtentDataSource);
@@ -154,14 +179,9 @@ public class FreegalImporter implements IRecordProcessor, I_ExternalImporter {
     @Override
 	public void finish() {
 		try {
-			int deleted = dao.deleteFreegalRecordsFlaggedAsDeleted();
+			int deleted = this.eContentRecordDAO.deleteFreegalRecordsFlaggedAsDeleted();
 		} catch (SQLException e) {
 			logger.error("Error deleting records flagged as deleted", e);
 		}
 	}
-
-    @Override
-    public void accept(Object o) {
-
-    }
 }

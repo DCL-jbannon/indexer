@@ -44,11 +44,16 @@ public class ConnectionProvider {
     private static void loadDataSources(DynamicConfig config) {
         // Setup connections to vufind and econtent databases
 
+        int maxWait = 10*1000;
+        int maxThreads = 10;
+
         BasicDataSource vufindDataSource = new BasicDataSource();
         vufindDataSource.setDriverClassName(config.getString(BasicConfigOptions.VUFINDDB_DRIVER));
         vufindDataSource.setUsername(config.getString(BasicConfigOptions.VUFINDDB_USER));
         vufindDataSource.setPassword(config.getString(BasicConfigOptions.VUFINDDB_PASS));
         vufindDataSource.setUrl(config.getString(BasicConfigOptions.VUFINDDB_URL));
+        vufindDataSource.setMaxWaitMillis(maxWait);
+        vufindDataSource.setMaxTotal(maxThreads);
         dataSourceHashtable.put(PrintOrEContent.PRINT, vufindDataSource);
 
         BasicDataSource econtentDataSource = new BasicDataSource();
@@ -56,6 +61,8 @@ public class ConnectionProvider {
         econtentDataSource.setUsername(config.getString(BasicConfigOptions.ECONTENTDB_USER));
         econtentDataSource.setPassword(config.getString(BasicConfigOptions.ECONTENTDB_PASS));
         econtentDataSource.setUrl(config.getString(BasicConfigOptions.ECONTENTDB_URL));
+        econtentDataSource.setMaxWaitMillis(maxWait);
+        econtentDataSource.setMaxTotal(maxThreads);
         dataSourceHashtable.put(PrintOrEContent.E_CONTENT, econtentDataSource);
     }
 }

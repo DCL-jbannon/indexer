@@ -1,20 +1,5 @@
 package org.vufind.processors;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-
-import org.API.OverDrive.OverDriveAPIServices;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.ConcurrentUpdateSolrServer;
 import org.apache.solr.client.solrj.request.LukeRequest;
@@ -24,40 +9,50 @@ import org.apache.solr.client.solrj.response.UpdateResponse;
 import org.apache.solr.common.SolrInputDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.vufind.config.Config;
+import org.vufind.ConnectionProvider;
 import org.vufind.config.DynamicConfig;
+import org.vufind.config.sections.BasicConfigOptions;
+import org.vufind.config.sections.EContentConfigOptions;
 import org.vufind.econtent.EContentRecord;
+import org.vufind.econtent.EContentRecordDAO;
+import org.vufind.econtent.EcontentRecordFactory;
+import org.vufind.solr.SolrUpdateServerFactory;
 
-public class EContentIndexer implements IRecordProcessor, IEContentProcessor {
+import java.io.*;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.*;
+
+public class EContentIndexer implements IEContentProcessor {
     final static Logger logger = LoggerFactory.getLogger(EContentIndexer.class);
 
-    private Config config;
-
+    private DynamicConfig config;
 
 	private Properties collectionGroupMap;
 	private Properties itemTypeFormatMap;
 	private Properties deviceCompatibilityMap;
-	private OverDriveAPIServices overDriveAPIServices;
+    private EContentRecordDAO eContentRecordDAO;
 	private String fullTextPath;
 	private boolean finished = false;
 
     private List<String> solrFields = null;
 
 	@Override
-	public boolean processEContentRecord(String indexName, ResultSet rs) {
-
+	public boolean processEContentRecord(ResultSet rs) {
 		EContentRecord record;
 		try {
-			record = new EContentRecord(config.getEContentRecordDAO(), rs);
+			//record = new EContentRecord(new EContentRecordDAO(ConnectionProvider.getDataSource(config, ConnectionProvider.PrintOrEContent.E_CONTENT)), rs);
+            record = EcontentRecordFactory.getRecordFactory(config).get(eContentRecordDAO, rs);
 		} catch (SQLException e) {
 			logger.error("Error instantiating EContentRecord from ResultSet.", e);
 			return false;
 		}
 
-		Object id = record.get("id");
+        Object id = record.get("id");
         logger.info("Indexing econtent record: " + id);
 
-        ConcurrentUpdateSolrServer solrServer = config.getSolrUpdateServer(indexName);
+        ConcurrentUpdateSolrServer solrServer = SolrUpdateServerFactory.getSolrUpdateServer(config.get(BasicConfigOptions.BASE_SOLR_URL).toString()
+                + config.get(BasicConfigOptions.ECONTENT_CORE).toString());
         if(solrFields==null){
             try {
                 solrFields = readFieldNames(solrServer);
@@ -70,7 +65,7 @@ public class EContentIndexer implements IRecordProcessor, IEContentProcessor {
 		// get record as a solr document
 		SolrInputDocument doc = record.getSolrInputDocument(solrFields,
 				collectionGroupMap, itemTypeFormatMap, deviceCompatibilityMap,
-				overDriveAPIServices, fullTextPath);
+                fullTextPath);
 
 		// Add document to index
 		try {
@@ -88,14 +83,15 @@ public class EContentIndexer implements IRecordProcessor, IEContentProcessor {
 	}
 
 
-	public boolean init(Config config) {
+	public boolean init(DynamicConfig config) {
+        this.config = config;
+		fullTextPath = config.getString(EContentConfigOptions.COLLECTION_GROUP_MAP_PATH);
 
-		fullTextPath = config.getEcontentFileFolder();
-
+        eContentRecordDAO = new EContentRecordDAO(ConnectionProvider.getDataSource(config, ConnectionProvider.PrintOrEContent.E_CONTENT));
 		// Load Collection Group map
 		collectionGroupMap = new Properties();
 
-		File file = new File(config.getEcontentCollectionGroupMapPath());
+		File file = new File(fullTextPath);
 		logger.info("Trying to load collection group map from "+ file.getAbsolutePath());
 		try {
 			collectionGroupMap.load(new FileInputStream(file));
@@ -110,7 +106,7 @@ public class EContentIndexer implements IRecordProcessor, IEContentProcessor {
 		// Load item type to format map
 		itemTypeFormatMap = new Properties();
 
-		file = new File(config.getEcontentItemTypeFormatMapPath());
+		file = new File(config.getString(EContentConfigOptions.ITEM_TYPE_FORMAT_MAP_PATH));
 		try {
 			loadIniFileAsProperties(file, itemTypeFormatMap);
 		} catch (FileNotFoundException e) {
@@ -124,7 +120,7 @@ public class EContentIndexer implements IRecordProcessor, IEContentProcessor {
 		// Load device compatibility map
 
 		deviceCompatibilityMap = new Properties();
-		file = new File(config.getEcontentDeviceCompatibilityMapPath());
+		file = new File(config.getString(EContentConfigOptions.DEVICE_COMPATIBILTY_MAP_PATH));
 		logger.info("Trying to load device compatibility map from "+ file.getAbsolutePath());
 		try {
 			loadIniFileAsProperties(file, deviceCompatibilityMap);
@@ -153,11 +149,6 @@ public class EContentIndexer implements IRecordProcessor, IEContentProcessor {
 
 		return true;
 	}
-
-    @Override
-    public boolean init(DynamicConfig config) {
-        return false;
-    }
 
     @Override
 	public void finish() {

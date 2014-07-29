@@ -126,15 +126,19 @@ public class EContentRecordDAO {
         if(allRecords==null) {
             allRecords = new HashMap<String, EContentRecord>();
             this.getAllFreegalRecordPS = getActivePreparedStatement(this.getAllFreegalRecordPS,
-                    "SELECT * FROM econtent_record WHERE id=?");
+                    "SELECT * FROM econtent_record WHERE lower(source)='freegal'");
             ResultSet rs = this.getAllFreegalRecordPS.executeQuery();
             while (rs.next()) {
-                allRecords.put( rs.getString("title")+rs.getString("author"), new EContentRecord(this, rs));
+                allRecords.put( getAllRecordsKey(rs.getString("title"),rs.getString("author")), new EContentRecord(this, rs));
             }
             rs.close();
         }
 
         return allRecords;
+    }
+
+    private String getAllRecordsKey(String title, String author) {
+        return title+author;
     }
 
 	/**
@@ -149,7 +153,7 @@ public class EContentRecordDAO {
 			throws SQLException {
         HashMap<String, EContentRecord> allRecords = selectAllFreegalRecordsInDB();
 
-		return allRecords.get(title+author);
+		return allRecords.get(getAllRecordsKey(title,author));
 	}
 
 	/**
@@ -175,7 +179,7 @@ public class EContentRecordDAO {
 		String columnList = "";
 		String paramList = "";
 		String separator = "";
-		Set<String> columns = record.getSetProperties();
+		List<String> columns = record.getSetProperties();
 		for (String column : columns) {
 			columnList += separator + column;
 			paramList += separator + "?";
@@ -196,9 +200,11 @@ public class EContentRecordDAO {
 			id = generatedKeys.getLong(1);
 		}
 		record.set("id", id);
+        allRecords.put(getAllRecordsKey(record.getString("title"), record.getString("author")), record);
 		return id;
 	}
 
+    private String lastUpdateRecordsQuery = null;
     private PreparedStatement updateRecordPS = null;
 	/**
 	 * Update the given record.
@@ -210,23 +216,49 @@ public class EContentRecordDAO {
 	public long update(EContentRecord record) throws SQLException {
 		String columnList = "";
 		String separator = "";
-		Set<String> columns = record.getSetProperties();
+        if(record.getString("title") != null && record.getString("title").equals("Gluck: Trio Sonatas")) {
+            int ii = 0;
+            ii++;
+        }
+
+		List<String> columns = record.getSetProperties();
+        columns.remove("id");
 		for (String column : columns) {
 			columnList += separator + column + "=?";
 			separator = ",";
 		}
-		String query = "UPDATE econtent_record SET " + columnList
-				+ " WHERE id=?";
+
+        String query = "UPDATE econtent_record SET " + columnList
+                + " WHERE id=?";
+
+        if(!query.equals(lastUpdateRecordsQuery)) {
+            lastUpdateRecordsQuery = query;
+            if(updateRecordPS!=null) {
+                this.updateRecordPS.close();
+                this.updateRecordPS = null;
+            }
+        }
+
+        this.updateRecordPS = getActivePreparedStatement(this.updateRecordPS, query);
+        this.updateRecordPS.clearParameters();
 
 		logger.debug(query);
-        this.updateRecordPS = getActivePreparedStatement(this.updateRecordPS, query);
+
+
 		int index = 1;
 		for (String column : columns) {
-			setEContentRecordParameter(this.updateRecordPS, index++, column, record);
+			setEContentRecordParameter(this.updateRecordPS, index, column, record);
+            index++;
 		}
         this.updateRecordPS.setLong(index, record.getInteger("id"));
-		int rowsUpdated = this.updateRecordPS.executeUpdate();
+		int rowsUpdated = 0;
+        try {
+            rowsUpdated = this.updateRecordPS.executeUpdate();
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
 
+        allRecords.put(getAllRecordsKey(record.getString("title"), record.getString("author")), record);
 		return rowsUpdated;
 	}
 
@@ -246,16 +278,16 @@ public class EContentRecordDAO {
         PreparedStatement ret = null;
         try {
             if (checkMe == null || checkMe.isClosed() || connection == null || connection.isClosed()) {
-                ret = connection.prepareStatement(sqlStr, PreparedStatement.NO_GENERATED_KEYS);
+                ret = connection.prepareStatement(sqlStr, PreparedStatement.RETURN_GENERATED_KEYS);
             } else {
                 ret = checkMe;
             }
         } catch(SQLException e) {
             //Try again, it's possible for isClosed() to throw a SQLException, and we should try to make sure we can't
             //continue anyway
-            ret = connection.prepareStatement(sqlStr, PreparedStatement.NO_GENERATED_KEYS);
+            ret = connection.prepareStatement(sqlStr, PreparedStatement.RETURN_GENERATED_KEYS);
         }
-        return checkMe;
+        return ret;
     }
 
     private PreparedStatement insertEcontentItemPS = null;
@@ -277,8 +309,12 @@ public class EContentRecordDAO {
         if(item.getNotes()==null) {
             this.insertEcontentItemPS.setNull(4, Types.VARCHAR);
         } else {
-
-            this.insertEcontentItemPS.setString(4, item.getNotes());
+            String notes = item.getNotes();
+            if(notes.length() > 250) {
+                System.out.println("Long notes: "+item.getNotes());
+                notes = notes.substring(0, 240);
+            }
+            this.insertEcontentItemPS.setString(4, notes);
         }
         if(item.getAddedBy()==null) {
             this.insertEcontentItemPS.setNull(5, Types.VARCHAR);
@@ -301,7 +337,11 @@ public class EContentRecordDAO {
 	}
 
     public void flushEContentItems(boolean clean) throws SQLException {
-        this.insertEcontentItemPS.executeBatch();
+        try{
+            this.insertEcontentItemPS.executeBatch();
+        } catch(SQLException e) {
+            logger.error("Error flushing EContentRecords", e);
+        }
         if(clean) {
             this.insertEcontentItemPS.close();
             this.insertEcontentItemPS = null;
@@ -338,6 +378,10 @@ public class EContentRecordDAO {
 
 	private void setEContentRecordParameter(PreparedStatement stmt, int index,
 			String column, EContentRecord record) throws SQLException {
+        if( column.equals("addedBy")) {
+            int ii = 0;
+            ii++;
+        }
 		if (column.equals("id") || column.equals("availableCopies")
 				|| column.equals("onOrderCopies") || column.equals("addedBy")
 				|| column.equals("date_added") || column.equals("date_updated")

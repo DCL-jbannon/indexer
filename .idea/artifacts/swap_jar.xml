@@ -1,7 +1,7 @@
 <component name="ArtifactManager">
-  <artifact type="jar" build-on-make="true" name="indexer:jar">
-    <output-path>$PROJECT_DIR$/out/artifacts/indexer_jar</output-path>
-    <root id="archive" name="indexer.jar">
+  <artifact type="jar" build-on-make="true" name="swap:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/swap_jar</output-path>
+    <root id="archive" name="swap.jar">
       <element id="module-output" name="indexer" />
       <element id="extracted-dir" path="$PROJECT_DIR$/lib/marc4j.jar" path-in-jar="/" />
       <element id="extracted-dir" path="$PROJECT_DIR$/lib/bsh-2.0b4.jar" path-in-jar="/" />

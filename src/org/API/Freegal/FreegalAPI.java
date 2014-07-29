@@ -71,7 +71,7 @@ public class FreegalAPI {
 		String songUrl = freegalUrl + "/services/genre/" + freegalAPIkey + "/"
 				+ freegalLibrary + "/" + freegalUser + "/" + freegalPIN + "/"
 				+ base64Genre;
-		logger.info("Song url: " + songUrl);
+		logger.info("Get songs from genre url: " + songUrl);
 		Document songsDoc = null;
 		try {
 			DocumentBuilder songsDB = documentBuilderFactory.newDocumentBuilder();
@@ -97,7 +97,14 @@ public class FreegalAPI {
 				album.setAuthor(text);
 				if (!albums.containsKey(album.toString())) {
 					logger.info("Found new album " + album.toString());
-					album.setGenre(genre);
+                    String realGenre = "MUSIC";
+                    try{
+                        realGenre = songNode.getElementsByTagName("Genre").item(0).getTextContent().trim();
+                        if(realGenre.endsWith(",")) {
+                            realGenre = realGenre.substring(0, realGenre.length() - 1);
+                        }
+                    } catch (Exception e){}
+					album.setGenre(realGenre);
 					tags = songNode.getElementsByTagName("Album_Artwork");
 					text = tags.getLength() > 0 ? tags.item(0).getTextContent() : null; 
 					album.setCoverUrl(text);

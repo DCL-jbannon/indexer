@@ -11,7 +11,7 @@ import org.vufind.Util;
 import org.vufind.config.Config;
 import org.vufind.config.DynamicConfig;
 
-public class AlphaBrowseProcessor implements IResourceProcessor, IRecordProcessor {
+public class AlphaBrowseProcessor {
     final static Logger logger = LoggerFactory.getLogger(AlphaBrowseProcessor.class);
 
     Config config = null;
@@ -20,24 +20,7 @@ public class AlphaBrowseProcessor implements IResourceProcessor, IRecordProcesso
 	private TreeMap<String, ArrayList<String>> callNumberBrowseInfo;
 	private TreeMap<String, ArrayList<String>> subjectBrowseInfo;*/
 
-	public boolean init(Config config) {
-		return true;
-	}
-	
-	@Override
-	public boolean processResource(ResultSet resource) {
-		//For alpha browse processing, everything is handled in the finish method
-
-		return true;
-	}
-
-    @Override
-    public boolean init(DynamicConfig config) {
-        return false;
-    }
-
-    @Override
-	public void finish() {
+	public void process() {
         Connection vufindConn = null;
         try {
             vufindConn = config.getVufindDatasource().getConnection();
@@ -178,9 +161,4 @@ public class AlphaBrowseProcessor implements IResourceProcessor, IRecordProcesso
 			logger.error("Error updating Alphabetic Browse", e);
 		}
 	}
-
-    @Override
-    public void accept(Object o) {
-
-    }
 }

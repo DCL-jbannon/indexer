@@ -35,7 +35,10 @@ public class MarcIndexer implements IMarcRecordProcessor {
     @Override
 	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
         logger.info("Processing record: "+recordInfo.getId());
-
+        if(recordInfo.getId().equals("1118588") ) {
+            int ii = 0;
+            ii++;
+        }
 		try {
             MarcProcessor.RecordStatus recordStatus = recordInfo.getRecordStatus();
 			if (recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED

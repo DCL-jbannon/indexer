@@ -18,9 +18,10 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.*;
 
-public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcessor, IRecordProcessor {
+public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcessor {
     final static Logger logger = LoggerFactory.getLogger(StrandsProcessor.class);
 
     private DynamicConfig config = null;
@@ -37,7 +38,7 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 	public boolean init(DynamicConfig config) {
         this.config = config;
 
-        ConfigFiller.fill(config, Arrays.asList(StrandsConfigOptions.values()), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
+        ConfigFiller.fill(config, StrandsConfigOptions.values(), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
 		logger.info("Creating Catalog File for Strands");
 
 		try {
@@ -87,19 +88,36 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 
     private final Collection<String> emptyCollection = new ArrayList(Arrays.asList(new String[]{null, ""}));
 
-	@Override
-	public boolean processEContentRecord(String indexName, ResultSet eContentRecord) {
-        PreparedStatement getFormatsForRecord = null;
-        Connection econtentConn = ConnectionProvider.getConnection(config, ConnectionProvider.PrintOrEContent.E_CONTENT);
-        try {
-            getFormatsForRecord = econtentConn.prepareStatement("SELECT distinct item_type from econtent_item where recordId = ?");
+    private PreparedStatement getItemTypePreparedStatement = null;
+    private List<String> getFormatsForRecord(String recordId) {
+        if(getItemTypePreparedStatement==null) {
+            Connection econtentConn = ConnectionProvider.getConnection(config, ConnectionProvider.PrintOrEContent.E_CONTENT);
+            try {
+                getItemTypePreparedStatement = econtentConn.prepareStatement("SELECT distinct item_type from econtent_item where recordId = ?");
 
-        } catch (Exception ex) {
-            // handle any errors
-            logger.error("Error processing eContent ", ex);
-            return false;
+            } catch (Exception ex) {
+                // handle any errors
+                logger.error("Error processing eContent ", ex);
+            }
         }
 
+        List<String> formats = new ArrayList();
+        try {
+            getItemTypePreparedStatement.setString(1, recordId);
+            ResultSet formatsRs = getItemTypePreparedStatement.executeQuery();
+            while (formatsRs.next()) {
+                formats.add(formatsRs.getString(1));
+            }
+        } catch (SQLException e) {
+           logger.error("SQL Error while loading item formats", e);
+        }
+
+
+        return null;
+    }
+
+	@Override
+	public boolean processEContentRecord(ResultSet eContentRecord) {
 		try {
 			// Write the id
             ContentBean content = new ContentBean();
@@ -126,12 +144,7 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 
             content.setGenre(prepForCsv(eContentRecord.getString("genre")));
 
-            List<String> formats = new ArrayList();
-            getFormatsForRecord.setString(1, id);
-            ResultSet formatsRs = getFormatsForRecord.executeQuery();
-            while (formatsRs.next()) {
-                formats.add(formatsRs.getString(1));
-            }
+            List<String> formats = this.getFormatsForRecord(id);
             content.setFormat(getSemiColonSeparatedString(formats, true));
 
             content.setSubject(eContentRecord.getString("subject"));
@@ -162,10 +175,7 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
             ContentBean content = new ContentBean();
 
             String id = recordInfo.getId();
-            if(id.equals("151")) {
-                int i = 0;
-                i++;
-            }
+
             logger.info("Processing record: "+recordInfo.getId());
             content.setId(recordInfo.getId());
 
@@ -250,7 +260,10 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
         }
     }
 
-    private static String prepForCsv(String value) {
+    private static String prepForCsv(String value)
+    {
+        if(value == null) return "";
+
         String ret = value.trim();
         if(value.endsWith(".")) {
             ret = ret.substring(0, ret.length()-1);

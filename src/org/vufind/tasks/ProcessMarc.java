@@ -24,14 +24,15 @@ import java.util.concurrent.ForkJoinTask;
  * Created by jbannon on 7/3/14.
  */
 public class ProcessMarc {
+    final static Logger logger = LoggerFactory.getLogger(ProcessMarc.class);
+
     public static void main(String[] args) {
-        if (args.length < 2) {
+        if (args.length < 1) {
             System.out
-                    .println("Please enter the config file loc as the first param and the index to init as the second");
+                    .println("Please enter the config file loc as the first param");
             System.exit(-1);
         }
         String configFolder = args[0];
-        String coreName = args[1];
 
 
         DynamicConfig config = new DynamicConfig();
@@ -40,10 +41,10 @@ public class ProcessMarc {
         config.put(BasicConfigOptions.CONFIG_FOLDER, configFolder);
 
         ProcessMarc processMarcTask = new ProcessMarc(config);
-        processMarcTask.run(coreName);
+        processMarcTask.run();
     }
 
-    final static Logger logger = LoggerFactory.getLogger(ProcessMarc.class);
+
     final DynamicConfig config;
     final private MarcProcessor marcProcessor;
 
@@ -70,7 +71,7 @@ public class ProcessMarc {
         }
     }
 
-    public void run(String indexName) {
+    public void run() {
         File runLog = new File("runLog.log");
         FileWriter runLogW = null;
         try {

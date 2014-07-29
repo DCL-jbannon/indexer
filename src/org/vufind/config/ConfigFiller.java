@@ -3,6 +3,8 @@ package org.vufind.config;
 import org.ini4j.Ini;
 import org.ini4j.InvalidFileFormatException;
 import org.ini4j.Profile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -20,7 +22,7 @@ import java.util.stream.Stream;
  * Created by jbannon on 7/3/14.
  */
 public class ConfigFiller {
-
+    final static Logger logger = LoggerFactory.getLogger(ConfigFiller.class);
 
     public static void main(String[] args) {
         //just for testing
@@ -28,7 +30,7 @@ public class ConfigFiller {
 
         DynamicConfig config = new DynamicConfig();
 
-        fill(config, Arrays.asList(ConfigOption.values()), new File("./"));
+        fill(config, ConfigOption.values(), new File("./"));
         int i = 0;
     }
 
@@ -44,10 +46,12 @@ public class ConfigFiller {
             iniFile = new File(configFolder.getCanonicalPath()+"/"+iniPath);
             fillFromIni(config, options, iniFile);
         } catch (IOException e) {
-            e.printStackTrace();
+           logger.error("Could not fill config", e);
         }
+    }
 
-
+    public static void fill(DynamicConfig config, I_ConfigOption[] options, File configFolder) {
+        fill(config, Arrays.asList(options), configFolder);
     }
 
     private static void fillFromIni(DynamicConfig config, List<I_ConfigOption> options, File configFile) {
@@ -64,14 +68,20 @@ public class ConfigFiller {
         for(I_ConfigOption option : options) {
             Function f = option.getFillFunction();
             if(!option.isList()) {
-                config.put(option, option.getFillFunction().apply(ini.get("DATA", option.name())));
-
+                Object val = null;
+                try {
+                    val = option.getFillFunction().apply(ini.get("DATA", option.name()));
+                }catch(Exception e){}
+                if(val != null) {
+                    config.put(option, val);
+                }
             } else {
                 Ini.Section section = ini.get("DATA");
                 List<String> vals = section.getAll(option.name());
-                Stream<String> stream = vals.stream();
-
-                config.put(option, Arrays.asList(stream.map(option.getFillFunction()).toArray()));
+                if(vals!=null) {
+                    Stream<String> stream = vals.stream();
+                    config.put(option, Arrays.asList(stream.map(option.getFillFunction()).toArray()));
+                }
             }
         }
     }
@@ -80,13 +90,10 @@ public class ConfigFiller {
         Ini ini = new Ini();
         try {
             ini.load(new FileReader(file));
-        } catch (InvalidFileFormatException e) {
-            System.exit(-1);
-        } catch (FileNotFoundException e) {
-            System.exit(-1);
-        } catch (IOException e) {
-            System.exit(-1);
+        } catch ( IOException e  ) {
+            logger.error("Could not fill config", e);
         }
+
 
         return ini;
     }

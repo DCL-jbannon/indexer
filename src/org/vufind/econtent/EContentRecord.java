@@ -9,29 +9,18 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.TimeZone;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.*;
 
-import org.API.OverDrive.OverDriveAPIServices;
 import org.apache.solr.common.SolrInputDocument;
-import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class EContentRecord {
-	private static Logger logger = LoggerFactory.getLogger(EContentRecord.class);
+	protected static Logger logger = LoggerFactory.getLogger(EContentRecord.class);
 	private static final String RECORD_TYPE = "econtentRecord";
 	private Map<String, Object> properties;
 	private EContentRecordDAO dao = null;
-	private Set<String> formats = null;
+	protected Set<String> formats = null;
 
 	/**
 	 * Instantiate a new empty EContentRecord.
@@ -116,8 +105,12 @@ public class EContentRecord {
 	 * 
 	 * @return
 	 */
-	public Set<String> getSetProperties() {
-		return properties.keySet();
+	public List<String> getSetProperties() {
+        String[] setKeys = new String[]{};
+        setKeys  = properties.keySet().toArray(setKeys);
+        Arrays.sort(setKeys);
+
+		return new ArrayList<String>(Arrays.asList(setKeys));
 	}
 
 	/**
@@ -130,14 +123,14 @@ public class EContentRecord {
 	 * @return
 	 */
 	public SolrInputDocument getSolrInputDocument(List<String> solrFields,
-			Properties collectionGroupMap, Properties itemTypeFormatMap,
-			Properties deviceCompatibilityMap,
-			OverDriveAPIServices overDriveAPIServices, String fullTextPath) {
+                                                  Properties collectionGroupMap, Properties itemTypeFormatMap,
+                                                  Properties deviceCompatibilityMap,
+                                                  String fullTextPath) {
 		SolrInputDocument doc = new SolrInputDocument();
 		for (String name : solrFields) {
 			Object value = getSolrField(name, collectionGroupMap,
 					itemTypeFormatMap, deviceCompatibilityMap,
-					overDriveAPIServices, fullTextPath);
+                    fullTextPath);
 			if (value != null) {
 				doc.addField(name, value);
 			}
@@ -145,10 +138,9 @@ public class EContentRecord {
 		return doc;
 	}
 
-	@SuppressWarnings("unused")
-	private Object getSolrField(String name, Properties collectionGroupMap,
-			Properties itemTypeFormatMap, Properties deviceCompatibilityMap,
-			OverDriveAPIServices overDriveAPIServices, String fullTextPath) {
+	protected Object getSolrField(String name, Properties collectionGroupMap,
+                                  Properties itemTypeFormatMap, Properties deviceCompatibilityMap,
+                                  String fullTextPath) {
 		if (name.equals("id")) {
 			return RECORD_TYPE + getString("id");
 		}
@@ -166,18 +158,6 @@ public class EContentRecord {
 			return translateValue(collectionGroupMap, collection.trim());
 		}
 		if (name.equals("econtentText")) {
-			if (isOverDrive()) {
-				File file = new File(fullTextPath + "/" + get("id") + ".txt");
-				logger.debug("Looking for OverDrive epub text in: "
-						+ file.getAbsolutePath());
-				if (file.exists()) {
-					try {
-						return readFile(file);
-					} catch (IOException e) {
-						logger.error("Error reading epub text file.", e);
-					}
-				}
-			}
 			return null;
 		}
 		if (name.equals("subject_facet")) {
@@ -192,15 +172,13 @@ public class EContentRecord {
 			return "EMedia";
 		}
 		if (name.equals("format")) {
-			Set<String> formats = getFormats(itemTypeFormatMap,
-					overDriveAPIServices);
+			Set<String> formats = getFormats(itemTypeFormatMap);
 			logger.debug("formats => " + formats);
 			return formats;
 		}
 		if (name.equals("econtent_device")) {
 			Set<String> allDevices = new HashSet<String>();
-			Set<String> formats = getFormats(itemTypeFormatMap,
-					overDriveAPIServices);
+			Set<String> formats = getFormats(itemTypeFormatMap);
 			for (String format : formats) {
 				List devices = (List) deviceCompatibilityMap.get(format);
 				if (devices != null) {
@@ -267,10 +245,7 @@ public class EContentRecord {
 			if (!"active".equals(getString("status"))) {
 				return null;
 			}
-			String source = getString("source");
-			if (isOverDrive()) {
-				return 1;
-			}
+
 			if ("free".equalsIgnoreCase(getString("accessType"))) {
 				return 25;
 			}
@@ -281,9 +256,6 @@ public class EContentRecord {
 				return null;
 			}
 			String source = getString("source");
-			if (isOverDrive()) {
-				return "OverDrive";
-			}
 			if ("Freegal".equalsIgnoreCase(source)) {
 				return "Freegal";
 			}
@@ -372,8 +344,7 @@ public class EContentRecord {
 		return (val == null) ? "" : val;
 	}
 
-	private Set<String> getFormats(Properties itemTypeFormatMap,
-			OverDriveAPIServices overDriveAPIServices) {
+	private Set<String> getFormats(Properties itemTypeFormatMap) {
 		// if formats have been determined, then simply return them
 		if (formats != null) {
 			return formats;
@@ -385,21 +356,7 @@ public class EContentRecord {
 			formats.add("EPUB");
 			return formats;
 		}
-		if (isOverDrive()) {
-			String overDriveId = getOverDriveId();
-			if (overDriveId != null) {
-				Set<String> overDriveFormats = getOverDriveFormats(
-						overDriveAPIServices, overDriveId);
-				StringBuilder buf = new StringBuilder();
-				String separator = "";
-				for (String format : overDriveFormats) {
-					buf.append(separator + format);
-					separator = ", ";
-				}
-				formats.add(buf.toString());
-			}
-			return formats;
-		}
+
 		// get formats from item types
 		try {
 			List<String> itemTypes = dao.getItemTypes(Long
@@ -434,42 +391,7 @@ public class EContentRecord {
 		return value;
 	}
 
-	private boolean isOverDrive() {
-		return ("OverDrive".equalsIgnoreCase(getString("source")) || "OverDriveAPI"
-				.equalsIgnoreCase(getString("source")));
-	}
-
-	private String getOverDriveId() {
-		String sourceUrl = getString("sourceUrl");
-		if (sourceUrl == null || sourceUrl.length() == 0) {
-			return null;
-		}
-		Pattern Regex = Pattern.compile(
-				"[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}",
-				Pattern.CANON_EQ);
-		Matcher RegexMatcher = Regex.matcher(sourceUrl);
-		String overDriveId = null;
-		if (RegexMatcher.find()) {
-			overDriveId = RegexMatcher.group();
-		}
-		return overDriveId;
-	}
-
-	private Set<String> getOverDriveFormats(
-			OverDriveAPIServices overDriveAPIServices, String overDriveId) {
-		Set<String> formats = new HashSet<String>();
-		JSONObject meta = overDriveAPIServices.getItemMetadata(overDriveId);
-		if (meta != null) {
-			List jsonFormats = (List) meta.get("formats");
-			for (Object o : jsonFormats) {
-				Map m = (Map) o;
-				formats.add((String) m.get("name"));
-			}
-		}
-		return formats;
-	}
-
-	private String readFile(File file) throws IOException {
+	protected String readFile(File file) throws IOException {
 		BufferedReader reader = new BufferedReader(new FileReader(file));
 		String line = null;
 		StringBuilder buf = new StringBuilder();

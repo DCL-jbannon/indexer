@@ -97,8 +97,8 @@ public class PopulateSolrOverDriveAPIItems
 			{
 				this.addNote("\rError getting Items. OFFSSET:" +  j*300 );
 			}
-			
-			
+
+
 			for (int i = 0; i < items.size(); i++) 
 			{
 				j++;

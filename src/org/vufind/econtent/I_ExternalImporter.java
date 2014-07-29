@@ -8,4 +8,5 @@ import org.vufind.config.DynamicConfig;
 public interface I_ExternalImporter {
     public void importRecords();
     public boolean init(DynamicConfig config);
+    public void finish();
 }

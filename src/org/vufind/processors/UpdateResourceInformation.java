@@ -162,6 +162,10 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
      * @return
      */
     private String getBestResourceVersion(String recordId) {
+        if(recordId.equals("1118588"))            {
+            int ii = 0;
+            ii++;
+        }
         try {
             getBestResourceVersionStmt.clearParameters();
             getBestResourceVersionStmt.setString(1, recordId);
@@ -262,10 +266,20 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 		
 		boolean updateSubjectAndCallNumber = true;
 
+        if(recordInfo.getId().equals("1118588"))            {
+            int ii = 0;
+            ii++;
+        }
+
+
 		if (recordInfo.isEContent()){
 			logger.debug("Skipping updating resource for record because it is eContent");
 			BasicResourceInfo basicResourceInfo = existingResources.get(recordInfo.getId());
 			if (basicResourceInfo != null && basicResourceInfo.getResourceId() != null ){
+                if(basicResourceInfo.getResourceId().equals("1118588"))            {
+                    int ii = 0;
+                    ii++;
+                }
 				existingResources.remove(recordInfo.getId());
 			}
 			return true;
@@ -455,7 +469,8 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 					numResourcesToDelete++;
 				}
 			}
-			logger.info("Deleting resources that no longer from resources table, there are " + numResourcesToDelete + " of "+ existingResources.size() + " resources to be deleted.");
+
+            logger.info("Deleting resources that no longer from resources table, there are " + numResourcesToDelete + " of "+ existingResources.size() + " resources to be deleted.");
 			int maxResourcesToDelete = 100;
 			int numResourcesAdded = 0;
 			for (BasicResourceInfo resourceInfo : existingResources.values()){
@@ -488,12 +503,15 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 		}
 	}
 
-
 	@Override
-	public boolean processEContentRecord(String indexName, ResultSet allEContent) {
+	public boolean processEContentRecord(ResultSet allEContent) {
 		try {
 			String econtentId = allEContent.getString("id");
-			
+			String ilsId = allEContent.getString("ilsId");
+            if("1118588".equals(econtentId) ||"1118588".equals(ilsId)) {
+                int ii = 0;
+                ii++;
+            }
 			//Load title information so we have access regardless of 
 			String title = allEContent.getString("title");
 			String subTitle = allEContent.getString("subTitle");

@@ -5,16 +5,20 @@ import org.API.OverDrive.OverDriveCollectionIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vufind.ConnectionProvider;
+import org.vufind.config.ConfigFiller;
 import org.vufind.config.DynamicConfig;
+import org.vufind.config.sections.BasicConfigOptions;
 import org.vufind.config.sections.OverDriveConfigOptions;
 
+import java.io.File;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Arrays;
 
 /**
  * Created by jbannon on 7/16/2014.
  */
-public class OverDriveImporter {
+public class OverDriveImporter implements I_ExternalImporter {
     final static Logger logger = LoggerFactory.getLogger(OverDriveImporter.class);
     private DynamicConfig config;
 
@@ -42,7 +46,14 @@ public class OverDriveImporter {
         }
     }
 
-    public void init(DynamicConfig config){
+    public boolean init(DynamicConfig config){
+        ConfigFiller.fill(config, OverDriveConfigOptions.values(),  new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
         this.config = config;
+        return true;
+    }
+
+    @Override
+    public void finish() {
+
     }
 }

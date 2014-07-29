@@ -16,20 +16,33 @@ import java.util.function.Function;
  */
 public class ReInitIndex {
     public static void main(String[] args) {
-        if (args.length < 2) {
+        logger.error("Just want to make sure this shows up. Starting ReInit");
+        if (args.length < 1) {
             System.out
-                    .println("Please enter the config file loc as the first param and the index to init as the second");
+                    .println("Please enter the config file loc");
             System.exit(-1);
         }
-        String confileFolder = args[0];
-        String coreName = args[1];
+        String configFolder = args[0];
 
+
+        System.out.println("configFolder: "+configFolder);
+
+        System.out.println("About to load config");
 
         DynamicConfig config = new DynamicConfig();
-        ConfigFiller.fill(config, Arrays.asList(BasicConfigOptions.values()), new File(confileFolder));
+        ConfigFiller.fill(config, Arrays.asList(BasicConfigOptions.values()), new File(configFolder));
+
+        System.out.println("Loaded Config");
 
         ReInitIndex reinit = new ReInitIndex(config);
-        reinit.clearSolrIndex(coreName);
+
+        String printCore = config.getString(BasicConfigOptions.PRINT_CORE);
+        String econtentCore = config.getString(BasicConfigOptions.ECONTENT_CORE);
+
+        System.out.println("PrintCore: "+printCore);
+        System.out.println("econtentCore: "+econtentCore);
+        reinit.clearSolrIndex(printCore);
+        reinit.clearSolrIndex(econtentCore);
     }
 
     final static Logger logger = LoggerFactory.getLogger(ReInitIndex.class);
@@ -45,6 +58,7 @@ public class ReInitIndex {
 
     public void clearSolrIndex(String indexName, String query) {
         logger.info("Clearing index["+indexName+"]");
+        logger.info("Calling["+config.get(BasicConfigOptions.BASE_SOLR_URL) + indexName + "/update/?commit=true");
         URLPostResponse response = Util.postToURL(config.get(BasicConfigOptions.BASE_SOLR_URL) + indexName + "/update/?commit=true", "<delete><query>" + query + "</query></delete>", logger);
         if (!response.isSuccess()){
             logger.info("Error clearing index["+indexName+"] -- "+response.getMessage());
