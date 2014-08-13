@@ -123,7 +123,7 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
             ContentBean content = new ContentBean();
 
 			String id = eContentRecord.getString("id");
-			logger.info("Processing eContentRecord " + id);
+			logger.debug("Processing eContentRecord " + id);
             content.setId("'econtentRecord" + id + "'");
             content.setLink(config.getString(BasicConfigOptions.VUFIND_URL) + "/EContentRecord/" + id);
             content.setTitle(eContentRecord.getString("title"));
@@ -165,7 +165,7 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 
 	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
 		try {
-            logger.info("Processing record: "+recordInfo.getId());
+            logger.debug("Processing record: "+recordInfo.getId());
 
             if(recordInfo.getRecordStatus() == MarcProcessor.RecordStatus.RECORD_DELETED) {
                 return true;
@@ -176,7 +176,7 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 
             String id = recordInfo.getId();
 
-            logger.info("Processing record: "+recordInfo.getId());
+            logger.debug("Processing record: "+recordInfo.getId());
             content.setId(recordInfo.getId());
 
             content.setLink(config.getString(BasicConfigOptions.VUFIND_URL) + "/Record/" + recordInfo.getId());

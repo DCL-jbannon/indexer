@@ -59,7 +59,7 @@ public class DBeContentRecordServicesTests extends BaseDBEcontentTests
 	}
 	
 	/**
-	 * method existOverDriveRecord
+	 * method overDriveRecordExists
 	 * when DoNotExists
 	 * should returnFalse
 	 * @throws SQLException 
@@ -68,7 +68,7 @@ public class DBeContentRecordServicesTests extends BaseDBEcontentTests
 	public void test_existOverDriveRecord_DoNotExists_returnTrue() throws SQLException 
 	{
 		this.insertNoValidOverDriveRecord();
-		Boolean actual = this.service.existOverDriveRecord(this.overDriveID, this.source);
+		Boolean actual = this.service.overDriveRecordExists(this.overDriveID, this.source);
 		assertFalse(actual);
 	}
 	
@@ -82,7 +82,7 @@ public class DBeContentRecordServicesTests extends BaseDBEcontentTests
     }
 	
 	/**
-	 * method existOverDriveRecord
+	 * method overDriveRecordExists
 	 * when existsAndSourceisOverDrive
 	 * should returnTrue
 	 * @throws SQLException 
@@ -91,12 +91,12 @@ public class DBeContentRecordServicesTests extends BaseDBEcontentTests
 	public void test_existOverDriveRecord_existsAndSourceisOverDrive_returnTrue() throws SQLException
 	{
 		this.insertValidOverDriveRecords();
-		Boolean actual = this.service.existOverDriveRecord(this.overDriveID, this.source);
+		Boolean actual = this.service.overDriveRecordExists(this.overDriveID, this.source);
 		assertTrue(actual);
 	}
 	
 	/**
-	 * method selectRecordIdByOverDriveIdBySource
+	 * method getRecordId
 	 * when called
 	 * should executesCorrectly
 	 * @throws SQLException 
@@ -105,7 +105,7 @@ public class DBeContentRecordServicesTests extends BaseDBEcontentTests
 	public void test_selectRecordIdByOverDriveIdBySource_called_executesCorrectly() throws SQLException 
 	{
 		this.insertValidOverDriveRecords();
-		String actual = this.service.selectRecordIdByOverDriveIdBySource(this.overDriveID, this.source);
+		String actual = this.service.getRecordId(this.overDriveID, this.source);
 		assertEquals(this.expectedId, actual);
 	}
 	
@@ -120,7 +120,7 @@ public class DBeContentRecordServicesTests extends BaseDBEcontentTests
 	{
 		this.insertValidOverDriveRecords();
 		this.service.deleteRecordById(this.deleteId);
-		Boolean actual = this.service.existOverDriveRecord(this.overDriveID, this.source);
+		Boolean actual = this.service.overDriveRecordExists(this.overDriveID, this.source);
 		assertFalse(actual);
 	}
 	
@@ -139,7 +139,7 @@ public class DBeContentRecordServicesTests extends BaseDBEcontentTests
 		Mockito.when(this.overDriveApiUtilsMock.getAuthorFromAPIItem(item)).thenReturn(author);
 		
 		this.service.addOverDriveAPIItem(item);
-		Boolean actual = this.service.existOverDriveRecord(this.overDriveID, "OverDriveAPI");
+		Boolean actual = this.service.overDriveRecordExists(this.overDriveID, "OverDriveAPI");
 		assertTrue(actual);
 		
 		Mockito.verify(this.overDriveApiUtilsMock, Mockito.times(1)).getAuthorFromAPIItem(item);
@@ -158,7 +158,7 @@ public class DBeContentRecordServicesTests extends BaseDBEcontentTests
 		JSONObject item = this.overDriveAPIResultsMother.getItemMetadata(this.overDriveID);
 		item.put("title", "The Girl Who Kicked the Hornet's Nest");
 		this.service.addOverDriveAPIItem(item);
-		Boolean actual = this.service.existOverDriveRecord(this.overDriveID, "OverDriveAPI");
+		Boolean actual = this.service.overDriveRecordExists(this.overDriveID, "OverDriveAPI");
 		assertTrue(actual);
 	}
 	
@@ -174,7 +174,7 @@ public class DBeContentRecordServicesTests extends BaseDBEcontentTests
 		JSONObject item = this.overDriveAPIResultsMother.getItemMetadata(this.overDriveID);
 		item.put("subtitle", null);
 		this.service.addOverDriveAPIItem(item);
-		Boolean actual = this.service.existOverDriveRecord(this.overDriveID, "OverDriveAPI");
+		Boolean actual = this.service.overDriveRecordExists(this.overDriveID, "OverDriveAPI");
 		assertTrue(actual);
 	}
 	
@@ -195,10 +195,10 @@ public class DBeContentRecordServicesTests extends BaseDBEcontentTests
 		Mockito.when(this.overDriveApiUtilsMock.getISBNFromAPIItem(item)).thenReturn(isbn);
 		
 		this.service.addOverDriveAPIItem(item);
-		String recordId = this.service.selectRecordIdByOverDriveIdBySource(this.overDriveID, "OverDriveAPI");
+		String recordId = this.service.getRecordId(this.overDriveID, "OverDriveAPI");
 		this.service.updateOverDriveAPIItem(recordId, item);
 		
-		Boolean actual = this.service.existOverDriveRecord(this.overDriveID, "OverDriveAPI");
+		Boolean actual = this.service.overDriveRecordExists(this.overDriveID, "OverDriveAPI");
 		assertTrue(actual);
 		
 		Mockito.verify(this.overDriveApiUtilsMock, Mockito.times(2)).getAuthorFromAPIItem(item);

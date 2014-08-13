@@ -43,7 +43,7 @@ public class FreegalImporter implements I_ExternalImporter {
 
 			Collection<String> genres = new HashSet<String>();
             genres.addAll(freegalAPI.getAllGenres());
-            logger.info("Freegal Genre Number: " + genres.size());
+            logger.info("Number of Freegal Genres found: " + genres.size());
             int songsAdded = 0;
 
             // Remove all existing songs for the album from the
@@ -69,11 +69,7 @@ public class FreegalImporter implements I_ExternalImporter {
     private void syncEContentRecordsInDB(Collection<Album> albums) throws SQLException{
         for (Album album : albums) {
 
-            if(album.getTitle().startsWith("I'm Glad There Is You") || album.getTitle().startsWith("On Fire the album")) {
-                int ii = 0;
-                ii++;
-            }
-            logger.info("Processing album " + album.getTitle()
+            logger.debug("Processing album " + album.getTitle()
                     + " the album has " + album.getSongs().size()
                     + " songs");
             EContentRecord record = this.eContentRecordDAO.findByTitleAndAuthor(

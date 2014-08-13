@@ -88,10 +88,6 @@ public class MarcProcessor {
 	
 	//public boolean init(String serverName, Ini configIni, Connection vufindConn, Connection econtentConn, long reindexLogId) {
     public boolean init(DynamicConfig config) {
-
-        String serverName = "fake"; //FIX
-
-
 		marcRecordPath = config.getString(MarcConfigOptions.MARC_FOLDER);
 		// Get the directory where the marc records are stored.vufindConn
 		if (marcRecordPath == null || marcRecordPath.length() == 0) {
@@ -585,7 +581,8 @@ public class MarcProcessor {
 			}
 			
 			// suppress econtent records that are not present in MARC files
-			suppressInActiveEContentRecords();
+            //TODO nope! suppressInActiveEContentRecords() is a pile of crap, and couldn't be called from here anyway. Rethink.
+			//suppressInActiveEContentRecords();
 			return true;
 		} catch (Exception e) {
 			logger.error("Unable to process marc files", e);
@@ -596,7 +593,41 @@ public class MarcProcessor {
 		}
 	}
 
+    public RecordStatus calculateRecordStatus(Record record, MarcRecordDetails marcInfo) {
+        MarcIndexInfo marcIndexedInfo = null;
+
+        if(record.getLeader().getRecordStatus()=='d') {
+            //deleted record
+            logger.debug("Record is deleted");
+            return RecordStatus.RECORD_DELETED;
+
+        } else if (marcIndexInfo.containsKey(marcInfo.getId())) {
+            marcIndexedInfo = marcIndexInfo.get(marcInfo.getId());
+            if (marcInfo.getChecksum() != marcIndexedInfo.getChecksum()){
+                logger.debug("Record is changed - checksum");
+                return RecordStatus.RECORD_CHANGED;
+            }else if (marcInfo.getChecksum() != marcIndexedInfo.getBackupChecksum()){
+                logger.debug("Record is changed - backup checksum");
+                return RecordStatus.RECORD_CHANGED;
+            }else if (marcInfo.isEContent() != marcIndexedInfo.isEContent()){
+                logger.debug("Record is changed - econtent");
+                return RecordStatus.RECORD_CHANGED;
+            }else if (marcInfo.isEContent() != marcIndexedInfo.isBackupEContent()) {
+                logger.debug("Record is changed - backup econtent");
+                return RecordStatus.RECORD_CHANGED;
+            } else {
+                // logger.info("Record is unchanged");
+                return RecordStatus.RECORD_UNCHANGED;
+            }
+        } else {
+            logger.debug("Record is new");
+            return RecordStatus.RECORD_NEW;
+        }
+    }
+
 	private void processMarcFile(ArrayList<IMarcRecordProcessor> recordProcessors, Logger logger, File marcFile) {
+        int ii = 0;;
+        ii++;        //TODO do we ever this this now?
 		/*try {
 			logger.info("Processing file " + marcFile.toString());
 			// Open the marc record with Marc4j
@@ -778,6 +809,7 @@ public class MarcProcessor {
 	private void suppressInActiveEContentRecords() {
 		ArrayList<String> ids = new ArrayList<String>();
 		try {
+            //TODO this is shit. It can't possibly be working.
 			PreparedStatement inActiveEContentRecordsStmt = econtentConn.prepareStatement(
 				"SELECT id FROM econtent_record WHERE " +
 				"status='active' AND source <> 'Freegal' AND source <> 'OverDriveAPI' AND ilsId IS NOT NULL AND ilsId <> ' ' AND ilsId <> '' " +

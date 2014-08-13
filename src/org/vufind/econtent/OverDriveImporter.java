@@ -35,7 +35,7 @@ public class OverDriveImporter implements I_ExternalImporter {
 
         Connection econtentConn = ConnectionProvider.getConnection(config, ConnectionProvider.PrintOrEContent.E_CONTENT);
 
-        PopulateOverDriveAPIItems service = new PopulateOverDriveAPIItems(odci, econtentConn, overDriveAPIServices);
+        PopulateOverDriveAPIItems service = new PopulateOverDriveAPIItems(odci, econtentConn, overDriveAPIServices, config);
 
         try {
             service.execute();

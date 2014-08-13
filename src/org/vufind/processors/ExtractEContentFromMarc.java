@@ -1,5 +1,6 @@
 package org.vufind.processors;
 
+import java.io.File;
 import java.io.FileReader;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -19,7 +20,11 @@ import org.slf4j.LoggerFactory;
 import org.vufind.*;
 
 import au.com.bytecode.opencsv.CSVReader;
+import org.vufind.config.ConfigFiller;
 import org.vufind.config.DynamicConfig;
+import org.vufind.config.sections.BasicConfigOptions;
+import org.vufind.config.sections.FreegalConfigOptions;
+import org.vufind.config.sections.OverDriveConfigOptions;
 import org.vufind.econtent.DetectionSettings;
 import org.vufind.econtent.GutenbergItemInfo;
 import org.vufind.econtent.LibrarySpecificLink;
@@ -38,8 +43,6 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 
     private DynamicConfig config = null;
 
-	private boolean reindexUnchangedRecords;
-	private boolean checkOverDriveAvailability;
 	private String econtentDBConnectionInfo;
 	private String overdriveUrl;
 	private ArrayList<GutenbergItemInfo> gutenbergItemInfo = null;
@@ -68,52 +71,49 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 	
 	public boolean init(DynamicConfig config) {
 		this.config = config;
+        ConfigFiller.fill(config, OverDriveConfigOptions.values(), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
 
+		return resetPreparedStatements();
+	}
+
+    private boolean resetPreparedStatements() {
         Connection econtentConn = ConnectionProvider.getConnection(config, ConnectionProvider.PrintOrEContent.E_CONTENT);
 
         try {
-			//Connect to the vufind database
-			doesIlsIdExist = econtentConn.prepareStatement("SELECT id from econtent_record WHERE ilsId = ?");
-			createEContentRecord = econtentConn.prepareStatement("INSERT INTO econtent_record (ilsId, cover, source, title, subTitle, author, author2, description, contents, subject, language, publisher, edition, isbn, issn, upc, lccn, topic, genre, region, era, target_audience, sourceUrl, purchaseUrl, publishDate, marcControlField, accessType, date_added, marcRecord) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", PreparedStatement.RETURN_GENERATED_KEYS);
-			updateEContentRecord = econtentConn.prepareStatement("UPDATE econtent_record SET ilsId = ?, source = ?, title = ?, subTitle = ?, author = ?, author2 = ?, description = ?, contents = ?, subject = ?, language = ?, publisher = ?, edition = ?, isbn = ?, issn = ?, upc = ?, lccn = ?, topic = ?, genre = ?, region = ?, era = ?, target_audience = ?, sourceUrl = ?, purchaseUrl = ?, publishDate = ?, marcControlField = ?, accessType = ?, date_updated = ?, marcRecord = ? WHERE id = ?");
+            //Connect to the vufind database
+            doesIlsIdExist = econtentConn.prepareStatement("SELECT id from econtent_record WHERE ilsId = ?");
+            createEContentRecord = econtentConn.prepareStatement("INSERT INTO econtent_record (ilsId, cover, source, title, subTitle, author, author2, description, contents, subject, language, publisher, edition, isbn, issn, upc, lccn, topic, genre, region, era, target_audience, sourceUrl, purchaseUrl, publishDate, marcControlField, accessType, date_added, marcRecord) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", PreparedStatement.RETURN_GENERATED_KEYS);
+            updateEContentRecord = econtentConn.prepareStatement("UPDATE econtent_record SET ilsId = ?, source = ?, title = ?, subTitle = ?, author = ?, author2 = ?, description = ?, contents = ?, subject = ?, language = ?, publisher = ?, edition = ?, isbn = ?, issn = ?, upc = ?, lccn = ?, topic = ?, genre = ?, region = ?, era = ?, target_audience = ?, sourceUrl = ?, purchaseUrl = ?, publishDate = ?, marcControlField = ?, accessType = ?, date_updated = ?, marcRecord = ? WHERE id = ?");
             deleteEContentRecord = econtentConn.prepareStatement("DELETE FROM econtent_record WHERE ilsId = ?");
-			deleteEContentItem = econtentConn.prepareStatement("DELETE FROM econtent_item where id = ?");
+            deleteEContentItem = econtentConn.prepareStatement("DELETE FROM econtent_item where id = ?");
             deleteEContentItemForRecord = econtentConn.prepareStatement("DELETE ei.* FROM dclecontent_prod.econtent_item ei, dclecontent_prod.econtent_record er WHERE er.ilsId = ? AND er.id = ei.recordId");
 
-			doesGutenbergItemExist = econtentConn.prepareStatement("SELECT id from econtent_item WHERE recordId = ? AND item_type = ? and notes = ?");
-			addGutenbergItem = econtentConn.prepareStatement("INSERT INTO econtent_item (recordId, item_type, filename, folder, link, notes, date_added, addedBy, date_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-			updateGutenbergItem = econtentConn.prepareStatement("UPDATE econtent_item SET filename = ?, folder = ?, link = ?, date_updated =? WHERE recordId = ? AND item_type = ? AND notes = ?");
-			
-			existingEContentRecordLinks = econtentConn.prepareStatement("SELECT id, link, libraryId from econtent_item WHERE recordId = ?");
-			addSourceUrl = econtentConn.prepareStatement("INSERT INTO econtent_item (recordId, item_type, link, date_added, addedBy, date_updated, libraryId) VALUES (?, ?, ?, ?, ?, ?, ?)");
-			updateSourceUrl = econtentConn.prepareStatement("UPDATE econtent_item SET link = ?, date_updated =? WHERE id = ?");
-			
-			doesOverDriveIdExist =  econtentConn.prepareStatement("SELECT id, overDriveId, link from econtent_item WHERE recordId = ? AND item_type = ? AND libraryId = ?");
-			addOverDriveId = econtentConn.prepareStatement("INSERT INTO econtent_item (recordId, item_type, overDriveId, link, date_added, addedBy, date_updated, libraryId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-			updateOverDriveId = econtentConn.prepareStatement("UPDATE econtent_item SET overDriveId = ?, link = ?, date_updated =? WHERE id = ?");
-			
-			
-			createActiveEContentRecord = econtentConn.prepareStatement("INSERT INTO active_econtent_records (ilsId) VALUES (?)");
-		} catch (Exception ex) {
-			// handle any errors
-			logger.error("Error initializing econtent extraction ", ex);
-			return false;
-		}
-		return true;
-	}
+            doesGutenbergItemExist = econtentConn.prepareStatement("SELECT id from econtent_item WHERE recordId = ? AND item_type = ? and notes = ?");
+            addGutenbergItem = econtentConn.prepareStatement("INSERT INTO econtent_item (recordId, item_type, filename, folder, link, notes, date_added, addedBy, date_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            updateGutenbergItem = econtentConn.prepareStatement("UPDATE econtent_item SET filename = ?, folder = ?, link = ?, date_updated =? WHERE recordId = ? AND item_type = ? AND notes = ?");
+
+            existingEContentRecordLinks = econtentConn.prepareStatement("SELECT id, link, libraryId from econtent_item WHERE recordId = ?");
+            addSourceUrl = econtentConn.prepareStatement("INSERT INTO econtent_item (recordId, item_type, link, date_added, addedBy, date_updated, libraryId) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            updateSourceUrl = econtentConn.prepareStatement("UPDATE econtent_item SET link = ?, date_updated =? WHERE id = ?");
+
+            doesOverDriveIdExist =  econtentConn.prepareStatement("SELECT id, overDriveId, link from econtent_item WHERE recordId = ? AND item_type = ? AND libraryId = ?");
+            addOverDriveId = econtentConn.prepareStatement("INSERT INTO econtent_item (recordId, item_type, overDriveId, link, date_added, addedBy, date_updated, libraryId) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            updateOverDriveId = econtentConn.prepareStatement("UPDATE econtent_item SET overDriveId = ?, link = ?, date_updated =? WHERE id = ?");
+
+            createActiveEContentRecord = econtentConn.prepareStatement("INSERT INTO active_econtent_records (ilsId) VALUES (?)");
+        } catch (Exception ex) {
+            // handle any errors
+            logger.error("Error initializing econtent extraction ", ex);
+            return false;
+        }
+        return true;
+    }
 
 	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
 		try {
-            logger.info("Processing record: "+recordInfo.getId());
-
-			//Check the 856 tag to see if this is a source that we can handle.
-			if (!recordInfo.isEContent()){
-				logger.debug("Skipping record, it is not eContent");
-				return false;
-			}
+            logger.debug("Processing record: "+recordInfo.getId());
 
             String ilsId = recordInfo.getId();
-			ActiveEcontentUtils.addActiveEcontent(ilsId);
 
             if (ilsId.length() == 0){
                 //Get the ils id
@@ -121,11 +121,19 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
             }
 
             MarcProcessor.RecordStatus recordStatus = recordInfo.getRecordStatus();
-			if(recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED)
+			if(recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED && ! config.getBool(BasicConfigOptions.DO_FULL_REINDEX))
 			{
-				logger.info("Skipping eContent record because has not changed. Size Active Records: " + ActiveEcontentUtils.getList().size());
+				logger.debug("Skipping eContent extraction because record has not changed. Active Records: " + ActiveEcontentUtils.getList().size());
 				return false;
-			} else if (recordStatus == MarcProcessor.RecordStatus.RECORD_DELETED) {
+			}
+
+            //Check the 856 tag to see if this is a source that we can handle.
+            if (!recordInfo.isEContent()){
+                logger.debug("Skipping record, it is not eContent");
+                return false;
+            }
+
+            if (recordStatus == MarcProcessor.RecordStatus.RECORD_DELETED) {
                 deleteEContentItemForRecord.setString(1, ilsId);
                 deleteEContentItemForRecord.executeUpdate();
 
@@ -134,6 +142,8 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 
                 return true;
             }
+
+            ActiveEcontentUtils.addActiveEcontent(ilsId);
 
             logger.debug("Record is eContent, processing");
 			//Record is eContent, get additional details about how to process it.
@@ -149,11 +159,11 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 				//Generally should only have one source, but in theory there could be multiple sources for a single record
 				String accessType = detectionSettings.getAccessType();
 				//Make sure that overdrive titles are updated if we need to check availability
-				if (source.equalsIgnoreCase("overdrive") && checkOverDriveAvailability){
+				if (source.equalsIgnoreCase("overdrive") && config.getBool(OverDriveConfigOptions.CHECK_AVAILABILITY)){
 					//Overdrive record, force processing to make sure we get updated availability
 					logger.debug("Record is overdrive, forcing reindex to check overdrive availability");
 				}else if (recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED){
-					if (reindexUnchangedRecords){
+					if (config.getBool(BasicConfigOptions.DO_FULL_REINDEX)){
 						logger.debug("Record is unchanged, but reindex unchanged records is on");
 					}else{
 						logger.debug("Skipping because the record is not changed");
@@ -169,7 +179,8 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 				boolean importRecordIntoDatabase = true;
 				long eContentRecordId = -1;
 				if (ilsId.length() == 0){
-					logger.warn("ILS Id could not be found in the marc record, importing.  Running this file multiple times could result in duplicate records in the catalog.");
+					logger.error("ILS Id could not be found in the marc record, skipping.");
+                    return false;
 				}else{
 					doesIlsIdExist.setString(1, ilsId);
 					ResultSet ilsIdExists = doesIlsIdExist.executeQuery();
@@ -181,22 +192,11 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 						//Add to database
 						importRecordIntoDatabase = true;
 					}
-					/*createActiveEContentRecord.setString(1, ilsId);
-					int rowsInserted = createActiveEContentRecord.executeUpdate();
-					if (rowsInserted != 1){
-						String error = "Could not insert record with ilsId=" + ilsId + " into active_econtent_records table.";
-						logger.error(error);
-						results.incErrors();
-						results.addNote(error);
-					}*/
 				}		
-				
-				
-				
+
 				boolean recordAdded = false;
 				
 				//logger.info("ECONTENT: " + recordStatus + " " +ilsId);
-				
 				
 				logger.info("ADDING/UPDATING ECONTENT: " + recordStatus + " " +ilsId);
                 if (importRecordIntoDatabase){
@@ -312,6 +312,9 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 			logger.debug("Finished processing record");
 			return true;
 		} catch (Exception e) {
+            if(e instanceof SQLException) {
+                resetPreparedStatements();
+            }
 			logger.error("Error importing marc record ", e);
 			return false;
 		}finally{

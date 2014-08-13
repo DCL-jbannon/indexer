@@ -1,5 +1,7 @@
 package org.vufind.tasks;
 
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.core.util.StatusPrinter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vufind.ConnectionProvider;
@@ -28,6 +30,8 @@ public class IndexEContentFromDatabase {
     final static Logger logger = LoggerFactory.getLogger(ProcessMarc.class);
 
     public static void main(String[] args) {
+        StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
+
         try {
             if (args.length < 1) {
                 System.out

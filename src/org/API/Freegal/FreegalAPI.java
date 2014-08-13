@@ -48,7 +48,7 @@ public class FreegalAPI {
 		// Get a list of all genres in the freegal site
 		String genreUrl = freegalUrl + "/services/genre/" + freegalAPIkey + "/"
 				+ freegalLibrary + "/" + freegalUser;
-		logger.info("Genre url: " + genreUrl);
+		logger.debug("Genre url: " + genreUrl);
 		DocumentBuilder db = documentBuilderFactory.newDocumentBuilder();
 		Document genreDoc = db.parse(genreUrl);
 		NodeList genres = genreDoc.getElementsByTagName("Genre");
@@ -71,7 +71,7 @@ public class FreegalAPI {
 		String songUrl = freegalUrl + "/services/genre/" + freegalAPIkey + "/"
 				+ freegalLibrary + "/" + freegalUser + "/" + freegalPIN + "/"
 				+ base64Genre;
-		logger.info("Get songs from genre url: " + songUrl);
+		logger.debug("Get songs from genre url: " + songUrl);
 		Document songsDoc = null;
 		try {
 			DocumentBuilder songsDB = documentBuilderFactory.newDocumentBuilder();
@@ -81,7 +81,7 @@ public class FreegalAPI {
 			return albums.values();
 		}
 		NodeList songs = songsDoc.getElementsByTagName("Song");
-		logger.info("Found " + songs.getLength() + " songs for genre " + genre);
+		logger.debug("Found " + songs.getLength() + " songs for genre " + genre);
 
 		// Group the songs by album
 		for (int j = 0; j < songs.getLength(); j++) {
@@ -96,7 +96,7 @@ public class FreegalAPI {
 				text = tags.getLength() > 0 ? tags.item(0).getTextContent() : null; 
 				album.setAuthor(text);
 				if (!albums.containsKey(album.toString())) {
-					logger.info("Found new album " + album.toString());
+					logger.debug("Found new album " + album.toString());
                     String realGenre = "MUSIC";
                     try{
                         realGenre = songNode.getElementsByTagName("Genre").item(0).getTextContent().trim();

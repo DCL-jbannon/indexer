@@ -25,21 +25,28 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
 		this(conn, new OverDriveAPIUtils());
 	}
 
-	public Boolean existOverDriveRecord(String overDriveID, String source) throws SQLException 
+
+	public Boolean overDriveRecordExists(String overDriveID, String source) throws SQLException
 	{
-		PreparedStatement stmt = this.conn.prepareStatement("SELECT * FROM " + DBeContentRecordServices.tableName + " WHERE source='" + source + "' and sourceUrl like '%" + overDriveID + "%'");
-		ResultSet rs = stmt.executeQuery();
-		if(rs.next())
-		{
-			return true;
-		}
-		return false;
+        return getRecordId(overDriveID, source) != null;
  	}
 
-	public String selectRecordIdByOverDriveIdBySource(String overDriveID, String source) throws SQLException
+    private PreparedStatement selectRecordStatement = null;
+	public String getRecordId(String overDriveID, String source) throws SQLException
 	{
-		PreparedStatement stmt = this.conn.prepareStatement("SELECT id FROM " + DBeContentRecordServices.tableName + " WHERE source='" + source + "' and sourceUrl like '%" + overDriveID + "%'");
-		ResultSet rs = stmt.executeQuery();
+        if(selectRecordStatement==null) {
+            selectRecordStatement = this.conn.prepareStatement(
+                "SELECT id " +
+                "FROM " + DBeContentRecordServices.tableName + " " +
+                "WHERE " +
+                    "sourceUrl LIKE ? " +
+                    "AND source = ?");
+        }
+
+        selectRecordStatement.setString(1, "%"+overDriveID);
+        selectRecordStatement.setString(2, source);
+
+		ResultSet rs = selectRecordStatement.executeQuery();
 		if(rs.next())
 		{
 			return rs.getString("id");
@@ -47,15 +54,27 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
 		return null;
 	}
 
+    private PreparedStatement deleteRecordStatement = null;
 	public Boolean deleteRecordById(String id) throws SQLException 
 	{
-		PreparedStatement stmt = this.conn.prepareStatement("DELETE FROM " + DBeContentRecordServices.tableName + " WHERE id = " + id);
-		stmt.execute();
+        if(deleteRecordStatement==null) {
+            deleteRecordStatement = this.conn.prepareStatement(
+                    "DELETE FROM " + DBeContentRecordServices.tableName + " WHERE id = ?");
+        }
+        deleteRecordStatement.setString(1, id);
+        deleteRecordStatement.execute();
 		return true;
 	}
 
+    private PreparedStatement insertRecordStatement = null;
 	public Boolean addOverDriveAPIItem(JSONObject item) throws SQLException
 	{
+        if(insertRecordStatement==null) {
+            insertRecordStatement = this.conn.prepareStatement(
+                "INSERT INTO " + DBeContentRecordServices.tableName + "(`title`,`subTitle`,`accessType`, `author`, `source`, `sourceUrl`, `date_added`, `publisher`, `isbn`, `genre`) " +
+                "VALUES (?, ?, 'free', ?, 'OverDriveAPI', ?, ?, ?, ?, ?)");
+        }
+
 		long unixTime = System.currentTimeMillis() / 1000L;
 		
 		String overDriveId = (String) item.get("id");
@@ -66,21 +85,18 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
 		String isbn = ""+this.overDriveApiUtils.getISBNFromAPIItem(item);
 		String mediaType = (String) item.get("mediaType");
 		String sourceUrl = "http://www.emedia2go.org/ContentDetails.htm?ID="+overDriveId;
-		
-		String sql = "INSERT INTO " + DBeContentRecordServices.tableName + "(`id`,`title`,`subTitle`,`accessType`, `author`, `source`, `sourceUrl`, `date_added`, `publisher`, `isbn`, `genre`)";
-			   sql += "VALUES (NULL,?, ?, 'free', ?, 'OverDriveAPI', ?, ?, ?, ?, ?)";
+
 	   try
 	   {
-		   PreparedStatement stmt = this.conn.prepareStatement(sql);
-		   stmt.setString(1, "" + title);
-		   stmt.setString(2, "" + subtitle);
-		   stmt.setString(3, "" + author);
-		   stmt.setString(4, "" + sourceUrl);
-		   stmt.setString(5, "" + unixTime);
-		   stmt.setString(6, "" + publisher);
-		   stmt.setString(7, "" + isbn);
-		   stmt.setString(8, "" + mediaType);
-		   stmt.execute();
+           insertRecordStatement.setString(1, "" + title);
+           insertRecordStatement.setString(2, "" + subtitle);
+           insertRecordStatement.setString(3, "" + author);
+           insertRecordStatement.setString(4, "" + sourceUrl);
+           insertRecordStatement.setString(5, "" + unixTime);
+           insertRecordStatement.setString(6, "" + publisher);
+           insertRecordStatement.setString(7, "" + isbn);
+           insertRecordStatement.setString(8, "" + mediaType);
+           insertRecordStatement.execute();
 	   }
 	   catch(Exception e)
 	   {
@@ -90,8 +106,23 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
 	   return true;
 	}
 
+    private PreparedStatement updateRecordStatement = null;
 	public Boolean updateOverDriveAPIItem(String recordId, JSONObject item) throws SQLException
 	{
+        if(updateRecordStatement==null) {
+            updateRecordStatement = this.conn.prepareStatement(
+                "UPDATE `econtent_record` " +
+                "	  SET `title` = ? "+
+                "	  , `subTitle` = ? "+
+                "	  , `author` = ? "+
+                "	  , `sourceUrl` = ? "+
+                "	  , `date_updated` = ? "+
+                "	  , `publisher` = ? "+
+                "	  , `genre` = ? "+
+                "	  , `isbn` = ? "+
+                "	  WHERE `id` = ?");
+        }
+
 		long unixTime = System.currentTimeMillis() / 1000L;
 		String overDriveId = (String) item.get("id");
 		String title = (String) item.get("title");
@@ -101,31 +132,19 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
 		String sourceUrl = "http://www.emedia2go.org/ContentDetails.htm?ID="+overDriveId;
 		String mediaType = (String) item.get("mediaType");
 		String isbn = ""+this.overDriveApiUtils.getISBNFromAPIItem(item);
-		
-		String sql = "UPDATE `econtent_record` " +
-				"	  SET `title` = ? "+
-				"	  , `subTitle` = ? "+
-				"	  , `author` = ? "+
-				"	  , `sourceUrl` = ? "+
-				"	  , `date_updated` = ? "+
-				"	  , `publisher` = ? "+
-				"	  , `genre` = ? "+
-				"	  , `isbn` = ? "+
-				"	  WHERE `id` = ?;";
 		 
 		try
 		{
-		  PreparedStatement stmt = this.conn.prepareStatement(sql);
-		  stmt.setString(1, "" + title);
-		  stmt.setString(2, "" + subtitle);
-		  stmt.setString(3, "" + author);
-		  stmt.setString(4, "" + sourceUrl);
-		  stmt.setString(5, "" + unixTime);
-		  stmt.setString(6, "" + publisher);
-		  stmt.setString(7, "" + mediaType);
-		  stmt.setString(8, "" + isbn);
-		  stmt.setString(9, "" + recordId);
-		  stmt.execute();
+            updateRecordStatement.setString(1, "" + title);
+            updateRecordStatement.setString(2, "" + subtitle);
+            updateRecordStatement.setString(3, "" + author);
+            updateRecordStatement.setString(4, "" + sourceUrl);
+            updateRecordStatement.setString(5, "" + unixTime);
+            updateRecordStatement.setString(6, "" + publisher);
+            updateRecordStatement.setString(7, "" + mediaType);
+            updateRecordStatement.setString(8, "" + isbn);
+            updateRecordStatement.setString(9, "" + recordId);
+            updateRecordStatement.execute();
 		}
 		catch(Exception e)
 		{

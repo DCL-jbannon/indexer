@@ -1,5 +1,7 @@
 package org.vufind.tasks;
 
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.core.util.StatusPrinter;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.ConcurrentUpdateSolrServer;
 import org.marc4j.MarcPermissiveStreamReader;
@@ -27,6 +29,8 @@ public class ProcessMarc {
     final static Logger logger = LoggerFactory.getLogger(ProcessMarc.class);
 
     public static void main(String[] args) {
+        StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
+
         if (args.length < 1) {
             System.out
                     .println("Please enter the config file loc as the first param");
@@ -94,7 +98,9 @@ public class ProcessMarc {
         List<File> marcFiles = getMarcFiles();
         for(File marcFile : marcFiles) {
             InputStream input = null;
-            try {input = new FileInputStream(marcFile);} catch (FileNotFoundException e) {e.printStackTrace();}
+            try {input = new FileInputStream(marcFile);} catch (FileNotFoundException e) {
+                logger.error("Could not open file: " + marcFile.getAbsolutePath(), e);
+            }
             MarcReader reader = new MarcPermissiveStreamReader(input, true, true, "UTF8");
 
             List<MarcRecordDetails> records = null;
@@ -126,10 +132,8 @@ public class ProcessMarc {
                 solr.blockUntilFinished();
                 try {
                     solr.commit();
-                } catch (SolrServerException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    e.printStackTrace();
+                } catch (SolrServerException |IOException e) {
+                    logger.error("Could not commit to Solr", e);
                 }
 
                 System.out.println("------------------------\nAfter processing");

@@ -1,5 +1,7 @@
 package org.vufind.tasks;
 
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.core.util.StatusPrinter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vufind.config.*;
@@ -16,7 +18,9 @@ import java.util.function.Function;
  */
 public class ReInitIndex {
     public static void main(String[] args) {
-        logger.error("Just want to make sure this shows up. Starting ReInit");
+        StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
+
+        logger.info("Starting ReInit");
         if (args.length < 1) {
             System.out
                     .println("Please enter the config file loc");

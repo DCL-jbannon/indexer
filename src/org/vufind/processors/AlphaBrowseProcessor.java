@@ -5,25 +5,25 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.vufind.ConnectionProvider;
 import org.vufind.Util;
-import org.vufind.config.Config;
 import org.vufind.config.DynamicConfig;
 
 public class AlphaBrowseProcessor {
     final static Logger logger = LoggerFactory.getLogger(AlphaBrowseProcessor.class);
 
-    Config config = null;
 	/*private TreeMap<String, ArrayList<String>> titleBrowseInfo;
 	private TreeMap<String, ArrayList<String>> authorBrowseInfo;
 	private TreeMap<String, ArrayList<String>> callNumberBrowseInfo;
 	private TreeMap<String, ArrayList<String>> subjectBrowseInfo;*/
 
-	public void process() {
+	public void process(DynamicConfig config) {
         Connection vufindConn = null;
         try {
-            vufindConn = config.getVufindDatasource().getConnection();
+            vufindConn = ConnectionProvider.getDataSource(config, ConnectionProvider.PrintOrEContent.PRINT).getConnection();
         } catch (SQLException e) {
             logger.error("Couldn't get a database connection in AlphaBrowseProcessor");
             return;

@@ -306,7 +306,7 @@ public class Util {
 				logger.debug("  Read response");
 			} else {
 				logger.error("Received error " + conn.getResponseCode() + " posting to " + url);
-				logger.info(postData);
+				logger.error(postData);
 				// Get any errors
 				BufferedReader rd = new BufferedReader(new InputStreamReader(conn.getErrorStream()));
 				String line;

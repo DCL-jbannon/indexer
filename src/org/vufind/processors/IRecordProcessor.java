@@ -1,6 +1,5 @@
 package org.vufind.processors;
 
-import org.vufind.config.Config;
 import org.vufind.config.DynamicConfig;
 
 import java.util.function.Consumer;

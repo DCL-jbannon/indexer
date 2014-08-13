@@ -307,7 +307,8 @@ public class EContentRecordDAO {
         this.insertEcontentItemPS.setString(2, item.getLink());
         this.insertEcontentItemPS.setString(3, item.getType());
         if(item.getNotes()==null) {
-            this.insertEcontentItemPS.setNull(4, Types.VARCHAR);
+            //this.insertEcontentItemPS.setNull(4, Types.VARCHAR); //Causes an error with our table definition
+            this.insertEcontentItemPS.setString(4, ""); //This doesn't seem good
         } else {
             String notes = item.getNotes();
             if(notes.length() > 250) {

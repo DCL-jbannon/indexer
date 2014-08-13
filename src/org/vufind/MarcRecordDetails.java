@@ -1,5 +1,26 @@
 package org.vufind;
 
+import bsh.*;
+import com.jamesmurty.utils.XMLBuilder;
+import org.apache.solr.common.SolrInputDocument;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+import org.marc4j.MarcStreamWriter;
+import org.marc4j.MarcWriter;
+import org.marc4j.MarcXmlWriter;
+import org.marc4j.marc.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.solrmarc.tools.CallNumUtils;
+import org.solrmarc.tools.SolrMarcIndexerException;
+import org.solrmarc.tools.Utils;
+import org.vufind.econtent.DetectionSettings;
+import org.vufind.econtent.LibrarySpecificLink;
+
+import javax.xml.parsers.FactoryConfigurationError;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.TransformerException;
 import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
@@ -12,37 +33,8 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.zip.CRC32;
 
-import javax.xml.parsers.FactoryConfigurationError;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.TransformerException;
-
-import org.apache.solr.common.SolrInputDocument;
-import org.vufind.econtent.DetectionSettings;
-import org.vufind.econtent.LibrarySpecificLink;
-import org.marc4j.MarcStreamWriter;
-import org.marc4j.MarcWriter;
-import org.marc4j.MarcXmlWriter;
-import org.marc4j.marc.ControlField;
-import org.marc4j.marc.DataField;
-import org.marc4j.marc.Record;
-import org.marc4j.marc.Subfield;
-import org.marc4j.marc.VariableField;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.solrmarc.tools.CallNumUtils;
-import org.solrmarc.tools.SolrMarcIndexerException;
-import org.solrmarc.tools.Utils;
-
-import com.jamesmurty.utils.XMLBuilder;
-
-import bsh.BshMethod;
-import bsh.EvalError;
-import bsh.Interpreter;
-import bsh.Primitive;
-import bsh.UtilEvalError;
-
 public class MarcRecordDetails {
-    final static Logger logger = LoggerFactory.getLogger(MarcProcessor.class);
+    final static Logger logger = LoggerFactory.getLogger(MarcRecordDetails.class);
 
     private MarcProcessor marcProcessor;
 
@@ -57,7 +49,7 @@ public class MarcRecordDetails {
     private boolean urlsLoaded;
     private long checksum = -1;
 
-    private MarcProcessor.RecordStatus recordStatus = MarcProcessor.RecordStatus.RECORD_UNCHANGED;
+    private MarcProcessor.RecordStatus recordStatus = null; // MarcProcessor.RecordStatus.RECORD_UNCHANGED;
 
 	/**
 	 * Does basic mapping of fields to determine if the record has changed or not
@@ -77,11 +69,15 @@ public class MarcRecordDetails {
 		mapField("id", fieldVal, this.mappedFields);
 	}
 
+    //TODO
     public void setRecordStatus(MarcProcessor.RecordStatus recordStatus) {
         this.recordStatus = recordStatus;
     }
 
     public MarcProcessor.RecordStatus getRecordStatus() {
+        if(this.recordStatus==null) {
+            this.recordStatus = this.marcProcessor.calculateRecordStatus(this.record, this);
+        }
         return this.recordStatus;
     }
 
@@ -336,7 +332,7 @@ public class MarcRecordDetails {
 						//Also check link text for the record
 						libraryId = marcProcessor.getLibraryIdForLink(linkText);
 					}
-					//logger.info("Adding local url " + url + " library system: " + libraryId + " linkText: " + linkText);
+					logger.debug("Adding local url " + url + " library system: " + libraryId + " linkText: " + linkText);
 					sourceUrls.add(new LibrarySpecificLink(url, libraryId));
 				} 
 			} catch (PatternSyntaxException ex) {
@@ -1007,7 +1003,7 @@ public class MarcRecordDetails {
             id = (String)o;
         }
 
-		Class<?> classThatContainsMethod = this.getClass();
+		Class<?> thisClass = this.getClass();
 		Object objectThatContainsMethod = this;
 		try {
 
@@ -1026,12 +1022,12 @@ public class MarcRecordDetails {
 					objParms[i] = Util.cleanIniValue(parms[i].trim());
 				}
 				method = marcProcessor.getCustomMethodMap().get(functionName);
-				if (method == null) method = classThatContainsMethod.getMethod(functionName, parmClasses);
+				if (method == null) method = thisClass.getMethod(functionName, parmClasses);
 				returnType = method.getReturnType();
 				retval = method.invoke(objectThatContainsMethod, objParms);
 			} else {
 				method = marcProcessor.getCustomMethodMap().get(indexParm);
-				if (method == null) method = classThatContainsMethod.getMethod(indexParm);
+				if (method == null) method = thisClass.getMethod(indexParm);
 				returnType = method.getReturnType();
 				retval = method.invoke(objectThatContainsMethod);
 			}
@@ -1152,6 +1148,8 @@ public class MarcRecordDetails {
 		if (result == true) throw new SolrMarcIndexerException(SolrMarcIndexerException.DELETE);
 	}
 
+    DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:sss'Z'");
+
 	/**
 	 * Finish up the processing for a custom indexing function or a custom
 	 * BeanShell script method
@@ -1199,7 +1197,11 @@ public class MarcRecordDetails {
 			String field = (String) retval;
 			if (mapName != null && marcProcessor.findMap(mapName) != null) field = Utils.remap(field, marcProcessor.findMap(mapName), true);
 			addField(indexMap, indexField, null, field);
-		}
+		} else if( retval instanceof DateTime) {
+            String field = fmt.print(((DateTime)retval));
+            if (mapName != null && marcProcessor.findMap(mapName) != null) field = Utils.remap(field, marcProcessor.findMap(mapName), true);
+            addField(indexMap, indexField, null, field);
+        }
 		return false;
 	}
 
@@ -1558,14 +1560,14 @@ public class MarcRecordDetails {
 	public String getRating(String recordIdSpec) {
 		if (rating == null) {
 			String recordId = getFirstFieldVal(recordIdSpec);
-			// logger.info("Getting rating for " + recordId);
+			logger.debug("Getting rating for " + recordId);
 			// Check to see if the record has an eContent Record
 			rating = marcProcessor.getPrintRatings().get(recordId);
 			if (rating == null) {
 				rating = -2.5f;
 			}
 
-			// logger.info("Rating = " + rating.toString());
+			logger.debug("Rating = " + rating.toString());
 		}
 		return Float.toString(rating);
 	}
@@ -2913,7 +2915,7 @@ public class MarcRecordDetails {
 			if (!isEContent) {
 				String ilsId = this.getId();
 				if (marcProcessor.getExistingEContentIds().contains(ilsId)) {
-					//logger.info("Suppressing because there is an eContent record for " + ilsId);
+					logger.debug("Suppressing because there is an eContent record for " + ilsId);
 					isEContent = true;
 				}
 			}
@@ -3017,4 +3019,124 @@ public class MarcRecordDetails {
 		}
 		return doc;
 	}
+
+    private final static Pattern FOUR_DIGIT_PATTERN_BRACES = Pattern.compile("\\[[12]\\d{3,3}\\]");
+    private final static Pattern FOUR_DIGIT_PATTERN_ONE_BRACE = Pattern.compile("\\[[12]\\d{3,3}");
+    private final static Pattern FOUR_DIGIT_PATTERN_STARTING_WITH_1_2 = Pattern.compile("(20|19|18|17|16|15)[0-9][0-9]");
+    private final static Pattern FOUR_DIGIT_PATTERN_OTHER_1 = Pattern.compile("l\\d{3,3}");
+    private final static Pattern FOUR_DIGIT_PATTERN_OTHER_2 = Pattern.compile("\\[19\\]\\d{2,2}");
+    private final static Pattern FOUR_DIGIT_PATTERN_OTHER_3 = Pattern.compile("(20|19|18|17|16|15)[0-9][-?0-9]");
+    private final static Pattern FOUR_DIGIT_PATTERN_OTHER_4 = Pattern.compile("i.e. (20|19|18|17|16|15)[0-9][0-9]");
+    private final static Pattern BC_DATE_PATTERN = Pattern.compile("[0-9]+ [Bb][.]?[Cc][.]?");
+    private final static Pattern FOUR_DIGIT_PATTERN = Pattern.compile("\\d{4,4}");
+    private static Matcher matcher;
+    private static Matcher matcher_braces;
+    private static Matcher matcher_one_brace;
+    private static Matcher matcher_start_with_1_2;
+    private static Matcher matcher_l_plus_three_digits;
+    private static Matcher matcher_bracket_19_plus_two_digits;
+    private static Matcher matcher_ie_date;
+    private static Matcher matcher_bc_date;
+    private static Matcher matcher_three_digits_plus_unk;
+
+    /**
+     * Cleans non-digits from a String
+     * @param date String to parse
+     * @return Numeric part of date String (or null)
+     */
+    public String cleanDate(String date)
+    {
+        matcher_braces = FOUR_DIGIT_PATTERN_BRACES.matcher(date);
+        matcher_one_brace = FOUR_DIGIT_PATTERN_ONE_BRACE.matcher(date);
+        matcher_start_with_1_2 = FOUR_DIGIT_PATTERN_STARTING_WITH_1_2.matcher(date);
+        matcher_l_plus_three_digits = FOUR_DIGIT_PATTERN_OTHER_1.matcher(date);
+        matcher_bracket_19_plus_two_digits = FOUR_DIGIT_PATTERN_OTHER_2.matcher(date);
+        matcher_three_digits_plus_unk = FOUR_DIGIT_PATTERN_OTHER_3.matcher(date);
+        matcher_ie_date = FOUR_DIGIT_PATTERN_OTHER_4.matcher(date);
+        matcher = FOUR_DIGIT_PATTERN.matcher(date);
+        matcher_bc_date = BC_DATE_PATTERN.matcher(date);
+
+        String cleanDate = null; // raises DD-anomaly
+
+        if(matcher_braces.find())
+        {
+            cleanDate = matcher_braces.group();
+            cleanDate = Utils.removeOuterBrackets(cleanDate);
+            if (matcher.find())
+            {
+                String tmp = matcher.group();
+                if (!tmp.equals(cleanDate))
+                {
+                    tmp = "" + tmp;
+                }
+            }
+        }
+        else if (matcher_ie_date.find())
+        {
+            cleanDate = matcher_ie_date.group().replaceAll("i.e. ", "");
+        }
+        else if(matcher_one_brace.find())
+        {
+            cleanDate = matcher_one_brace.group();
+            cleanDate = Utils.removeOuterBrackets(cleanDate);
+            if (matcher.find())
+            {
+                String tmp = matcher.group();
+                if (!tmp.equals(cleanDate))
+                {
+                    tmp = "" + tmp;
+                }
+            }
+        }
+        else if(matcher_bc_date.find())
+        {
+            cleanDate = null;
+        }
+        else if(matcher_start_with_1_2.find())
+        {
+            cleanDate = matcher_start_with_1_2.group();
+        }
+        else if(matcher_l_plus_three_digits.find())
+        {
+            cleanDate = matcher_l_plus_three_digits.group().replaceAll("l", "1");
+        }
+        else if(matcher_bracket_19_plus_two_digits.find())
+        {
+            cleanDate = matcher_bracket_19_plus_two_digits.group().replaceAll("\\[", "").replaceAll("\\]", "");
+        }
+        else if(matcher_three_digits_plus_unk.find())
+        {
+            cleanDate = matcher_three_digits_plus_unk.group().replaceAll("[-?]", "0");
+        }
+        if (cleanDate != null)
+        {
+            logger.debug("Date : "+ date + " mapped to : "+ cleanDate);
+        }
+        else
+        {
+            logger.debug("No Date match: "+ date);
+        }
+        return cleanDate;
+    }
+
+    /**
+     * Return the date in 260c as a DateTime
+     * @return DateTime
+     */
+    public DateTime getSortableDate()
+    {
+        String date = getFieldVals("260c", ", ");
+        if (date == null || date.length() == 0)
+            return (null);
+        String cleanS = cleanDate(date);
+
+        DateTime dt = new DateTime();
+        try{
+            dt = dt.withYear(Integer.parseInt(cleanS)).withMonthOfYear(1).withDayOfMonth(1).withTime(0,0,0,0);
+        }catch(Exception e) {
+            dt = dt.withYear(1900).withMonthOfYear(1).withDayOfMonth(1).withTime(0,0,0,0);
+        }
+
+        return dt;
+    }
 }

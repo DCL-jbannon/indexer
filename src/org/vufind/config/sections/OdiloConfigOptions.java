@@ -8,18 +8,16 @@ import java.util.function.Function;
 /**
  * Created by jbannon on 7/7/14.
  */
-public enum OverDriveConfigOptions implements I_ConfigOption {
-    CLIENT_KEY(ConfigMethods::fillSimpleString, false),
-    CLIENT_SECRET(ConfigMethods::fillSimpleString, false),
-    LIBRARY_ID(ConfigMethods::fillInteger, false),
-    UPDATE_ALL(ConfigMethods::fillBool, false),
-    CHECK_AVAILABILITY(ConfigMethods::fillBool, false),
+public enum OdiloConfigOptions implements I_ConfigOption {
+    USER(ConfigMethods::fillSimpleString, false),
+    PASS(ConfigMethods::fillSimpleString, false),
+    URL(ConfigMethods::fillSimpleString, false),
     ;
 
     final private Function fillFunction;
     final private boolean isList;
 
-    OverDriveConfigOptions(Function fillFunction, boolean isList) {
+    OdiloConfigOptions(Function fillFunction, boolean isList) {
         this.isList = isList;
         this.fillFunction = fillFunction;
     }

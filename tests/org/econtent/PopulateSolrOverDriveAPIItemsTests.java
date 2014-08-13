@@ -115,14 +115,14 @@ public class PopulateSolrOverDriveAPIItemsTests {
 
 		Mockito.when(this.overDriveCollectionIteratorMock.next()).thenReturn(resultsDigitalCollection);
 
-		Mockito.when(this.daoEContentMock.existOverDriveRecord(overDriveId1, "OverDrive")).thenReturn(false);
-		Mockito.when(this.daoEContentMock.existOverDriveRecord(overDriveId2, "OverDrive")).thenReturn(false);
+		Mockito.when(this.daoEContentMock.overDriveRecordExists(overDriveId1, "OverDrive")).thenReturn(false);
+		Mockito.when(this.daoEContentMock.overDriveRecordExists(overDriveId2, "OverDrive")).thenReturn(false);
 		
 		Mockito.when(this.daoEContentMock.addOverDriveAPIItem(itemMetadata1)).thenReturn(true);
 		Mockito.when(this.daoEContentMock.addOverDriveAPIItem(itemMetadata2)).thenReturn(true);
 		
-		Mockito.when(this.daoEContentMock.selectRecordIdByOverDriveIdBySource(overDriveId1, "OverDriveAPI")).thenReturn(dbId1);
-		Mockito.when(this.daoEContentMock.selectRecordIdByOverDriveIdBySource(overDriveId2, "OverDriveAPI")).thenReturn(null).thenReturn(dbId2);
+		Mockito.when(this.daoEContentMock.getRecordId(overDriveId1, "OverDriveAPI")).thenReturn(dbId1);
+		Mockito.when(this.daoEContentMock.getRecordId(overDriveId2, "OverDriveAPI")).thenReturn(null).thenReturn(dbId2);
 		
 		Mockito.when(this.overDriveAPIServices.getItemMetadata(overDriveId1)).thenReturn(itemMetadata1);
 		Mockito.when(this.overDriveAPIServices.getItemMetadata(overDriveId2)).thenReturn(itemMetadata2);
@@ -195,11 +195,11 @@ public class PopulateSolrOverDriveAPIItemsTests {
 			   .thenReturn(false);
 		Mockito.when(this.overDriveCollectionIteratorMock.next()).thenReturn(resultsDigitalCollection);
 		
-		Mockito.when(this.daoEContentMock.existOverDriveRecord(overDriveId1, "OverDrive")).thenReturn(true);
-		Mockito.when(this.daoEContentMock.existOverDriveRecord(overDriveId2, "OverDrive")).thenReturn(true);
+		Mockito.when(this.daoEContentMock.overDriveRecordExists(overDriveId1, "OverDrive")).thenReturn(true);
+		Mockito.when(this.daoEContentMock.overDriveRecordExists(overDriveId2, "OverDrive")).thenReturn(true);
 		
-		Mockito.when(this.daoEContentMock.selectRecordIdByOverDriveIdBySource(overDriveId1, "OverDriveAPI")).thenReturn(dbId1);
-		Mockito.when(this.daoEContentMock.selectRecordIdByOverDriveIdBySource(overDriveId2, "OverDriveAPI")).thenReturn(null);
+		Mockito.when(this.daoEContentMock.getRecordId(overDriveId1, "OverDriveAPI")).thenReturn(dbId1);
+		Mockito.when(this.daoEContentMock.getRecordId(overDriveId2, "OverDriveAPI")).thenReturn(null);
 		
 		Mockito.when(this.solrWrapperMock.deleteDocumentById("econtentRecord" + dbId1)).thenReturn(null);
 		

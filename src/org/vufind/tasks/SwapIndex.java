@@ -22,6 +22,7 @@ import java.util.function.Function;
 public class SwapIndex {
     public static void main(String[] args) {
         StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
+
         if (args.length < 1) {
             System.out
                     .println("Please enter params: 1 - configFile");

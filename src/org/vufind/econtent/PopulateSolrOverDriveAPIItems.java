@@ -20,6 +20,8 @@ import org.solr.SolrUtils;
 import org.vufind.econtent.db.DBeContentRecordServices;
 import org.vufind.econtent.db.IDBeContentRecordServices;
 
+//TODO  I'm sort of confident this class isn't used and should be deleted
+
 public class PopulateSolrOverDriveAPIItems
 {
     final static Logger logger = LoggerFactory.getLogger(PopulateOverDriveAPIItems.class);
@@ -107,10 +109,10 @@ public class PopulateSolrOverDriveAPIItems
 				JSONObject item = (JSONObject) items.get(i);
 				
 				String overDriveId = (String) item.get("id");
-				Boolean dbExists = this.eContentRecordDAO.existOverDriveRecord((String) item.get("id"),"OverDrive");
+				Boolean dbExists = this.eContentRecordDAO.overDriveRecordExists((String) item.get("id"), "OverDrive");
 				if(dbExists)
 				{
-					String recordId = this.eContentRecordDAO.selectRecordIdByOverDriveIdBySource(overDriveId, "OverDriveAPI");
+					String recordId = this.eContentRecordDAO.getRecordId(overDriveId, "OverDriveAPI");
 					if(recordId != null)
 					{
 						try
@@ -129,7 +131,7 @@ public class PopulateSolrOverDriveAPIItems
 				}
 				else
 				{
-					String recordId = this.eContentRecordDAO.selectRecordIdByOverDriveIdBySource(overDriveId, "OverDriveAPI");
+					String recordId = this.eContentRecordDAO.getRecordId(overDriveId, "OverDriveAPI");
 					JSONObject itemMetadata = this.overDriveApiServices.getItemMetadata(overDriveId);
 					if(recordId == null)
 					{
@@ -137,7 +139,7 @@ public class PopulateSolrOverDriveAPIItems
 						{
 							this.addNote("New OverDrive API Item" + overDriveId);
 							this.eContentRecordDAO.addOverDriveAPIItem(itemMetadata);
-							recordId = this.eContentRecordDAO.selectRecordIdByOverDriveIdBySource(overDriveId, "OverDriveAPI");
+							recordId = this.eContentRecordDAO.getRecordId(overDriveId, "OverDriveAPI");
 						}
 						catch (Exception e)
 						{

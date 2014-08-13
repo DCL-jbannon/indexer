@@ -49,7 +49,7 @@ public class EContentIndexer implements IEContentProcessor {
 		}
 
         Object id = record.get("id");
-        logger.info("Indexing econtent record: " + id);
+        logger.debug("Indexing econtent record: " + id);
 
         ConcurrentUpdateSolrServer solrServer = SolrUpdateServerFactory.getSolrUpdateServer(config.get(BasicConfigOptions.BASE_SOLR_URL).toString()
                 + config.get(BasicConfigOptions.ECONTENT_CORE).toString());

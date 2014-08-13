@@ -1,5 +1,7 @@
 package org.vufind.tasks;
 
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.core.util.StatusPrinter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vufind.config.ConfigFiller;
@@ -24,6 +26,8 @@ import java.util.List;
 public class SyncExternalProvidersWithDatabase {
 
     public static void main(String[] args) {
+        StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
+
         if (args.length < 1) {
             System.out
                     .println("Please enter the config file loc as the first param");
@@ -49,30 +53,14 @@ public class SyncExternalProvidersWithDatabase {
     }
 
     private void run() {
+        StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
+
         List<I_ExternalImporter> importers = loadImporters();
 
         for(I_ExternalImporter importer: importers) {
             importer.init(config);
             importer.importRecords();
         }
-
-        /*logger.info("START import Freegal");
-        FreegalImporter freegalImporter = new FreegalImporter();
-        if (freegalImporter.init(config)) {
-            //recordProcessors.add(freegalImporter);
-            try {
-                freegalImporter.importRecords();
-            } catch (RuntimeException e) {
-                logger.error("Unknown error importing Freegal records.", e);
-            }
-        }
-        logger.info("END import Freegal");
-
-        // Import OverDrive records into econtent database
-        logger.info("START import OverDrive");
-        //harvestOverDrive();
-        logger.info("END import OverDrive");
-           */
     }
 
     private List<I_ExternalImporter> loadImporters() {
