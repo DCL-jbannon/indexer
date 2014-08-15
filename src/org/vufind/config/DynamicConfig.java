@@ -46,4 +46,8 @@ public class DynamicConfig {
     public void markFilledFor(Class clazz) {
         this.filledForOptions.add(clazz);
     }
+
+    public String toString() {
+        return values.toString();
+    }
 }

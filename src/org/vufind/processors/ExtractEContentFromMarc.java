@@ -22,9 +22,7 @@ import org.vufind.*;
 import au.com.bytecode.opencsv.CSVReader;
 import org.vufind.config.ConfigFiller;
 import org.vufind.config.DynamicConfig;
-import org.vufind.config.sections.BasicConfigOptions;
-import org.vufind.config.sections.FreegalConfigOptions;
-import org.vufind.config.sections.OverDriveConfigOptions;
+import org.vufind.config.sections.*;
 import org.vufind.econtent.DetectionSettings;
 import org.vufind.econtent.GutenbergItemInfo;
 import org.vufind.econtent.LibrarySpecificLink;
@@ -72,6 +70,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 	public boolean init(DynamicConfig config) {
 		this.config = config;
         ConfigFiller.fill(config, OverDriveConfigOptions.values(), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
+        ConfigFiller.fill(config, ExtractEContentConfigOptions.values(), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
 
 		return resetPreparedStatements();
 	}
@@ -121,7 +120,8 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
             }
 
             MarcProcessor.RecordStatus recordStatus = recordInfo.getRecordStatus();
-			if(recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED && ! config.getBool(BasicConfigOptions.DO_FULL_REINDEX))
+			if(recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED && !
+                    (config.getBool(BasicConfigOptions.DO_FULL_REINDEX) && config.getBool(ExtractEContentConfigOptions.UPDATE_UNCHANGED_MARC)))
 			{
 				logger.debug("Skipping eContent extraction because record has not changed. Active Records: " + ActiveEcontentUtils.getList().size());
 				return false;
@@ -198,7 +198,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 				
 				//logger.info("ECONTENT: " + recordStatus + " " +ilsId);
 				
-				logger.info("ADDING/UPDATING ECONTENT: " + recordStatus + " " +ilsId);
+				logger.debug("ADDING/UPDATING ECONTENT: " + recordStatus + " " + ilsId);
                 if (importRecordIntoDatabase){
 					//Add to database
 					//logger.info("Adding ils id " + ilsId + " to the database.");
@@ -359,7 +359,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 		}
 		
 		//Remove any links that no longer exist
-		logger.info("There are " + allLinks.size() + " links that need to be deleted");
+		logger.debug("There are " + allLinks.size() + " links that need to be deleted");
 		for (LinkInfo tmpLinkInfo : allLinks){
 			try {
 				deleteEContentItem.setLong(1, tmpLinkInfo.getItemId());

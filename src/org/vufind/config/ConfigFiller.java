@@ -48,6 +48,7 @@ public class ConfigFiller {
         } catch (IOException e) {
            logger.error("Could not fill config", e);
         }
+        logger.info("Filled config ["+firstOption.getClass()+"]" + "\n" + config.toString());
     }
 
     public static void fill(DynamicConfig config, I_ConfigOption[] options, File configFolder) {

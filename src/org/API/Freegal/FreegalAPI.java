@@ -81,7 +81,11 @@ public class FreegalAPI {
 			return albums.values();
 		}
 		NodeList songs = songsDoc.getElementsByTagName("Song");
-		logger.debug("Found " + songs.getLength() + " songs for genre " + genre);
+        if(songs.getLength()<1){
+            logger.info("Number of Freegal Genre songs found: 0");
+        } else {
+            logger.debug("Number of Freegal Genre songs found: " + songs.getLength());
+        }
 
 		// Group the songs by album
 		for (int j = 0; j < songs.getLength(); j++) {

@@ -43,7 +43,12 @@ public class FreegalImporter implements I_ExternalImporter {
 
 			Collection<String> genres = new HashSet<String>();
             genres.addAll(freegalAPI.getAllGenres());
-            logger.info("Number of Freegal Genres found: " + genres.size());
+            if(genres.size()<1){
+                logger.error("Number of Freegal Genres found: " + genres.size());
+            } else {
+                logger.info("Number of Freegal Genres found: " + genres.size());
+            }
+
             int songsAdded = 0;
 
             // Remove all existing songs for the album from the
@@ -77,7 +82,7 @@ public class FreegalImporter implements I_ExternalImporter {
             boolean added = false;
             if (record == null) {
                 // create new record
-                record = new EContentRecord(this.eContentRecordDAO);
+                record = new EContentRecord(this.eContentRecordDAO, config);
                 record.set("date_added",
                         (int) (new Date().getTime() / 100));
                 record.set("accessType", "free");
@@ -161,7 +166,7 @@ public class FreegalImporter implements I_ExternalImporter {
         ConfigFiller.fill(config, FreegalConfigOptions.values(), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
         this.config = config;
         BasicDataSource econtentDataSource = ConnectionProvider.getDataSource(config, ConnectionProvider.PrintOrEContent.E_CONTENT);
-        this.eContentRecordDAO = new EContentRecordDAO(econtentDataSource);
+        this.eContentRecordDAO = new EContentRecordDAO(econtentDataSource, config);
         this.freegalAPI = new FreegalAPI(
                 config.getString(FreegalConfigOptions.URL),
                 config.getString(FreegalConfigOptions.USER),

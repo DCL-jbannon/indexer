@@ -12,7 +12,7 @@ public class SolrUpdateServerFactory {
     static public ConcurrentUpdateSolrServer getSolrUpdateServer(final String solrURL) {
         ConcurrentUpdateSolrServer ret = solrServers.get(solrURL);
         if(ret == null) {
-            ret = new ConcurrentUpdateSolrServer(solrURL, 1024, 5);
+            ret = new ConcurrentUpdateSolrServer(solrURL, 1024*10, 20);
             solrServers.put(solrURL, ret);
         }
         return ret;

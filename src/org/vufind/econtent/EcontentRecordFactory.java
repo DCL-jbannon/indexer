@@ -81,8 +81,10 @@ public class EcontentRecordFactory {
                         //IF we have a record type configured for this source then use it
                         Class recordClass =  this.getSourceToRecordType().get(value);
                         try {
-                            Constructor cons = recordClass.getDeclaredConstructor(EContentRecordDAO.class, ResultSet.class);
-                            return (EContentRecord)cons.newInstance(eContentRecordDAO, rs);
+                            Constructor cons = recordClass.getDeclaredConstructor(EContentRecordDAO.class, ResultSet.class, DynamicConfig.class);
+                            EContentRecord record = (EContentRecord)cons.newInstance(eContentRecordDAO, rs, config);
+                            record.init();
+                            return record;
                         } catch (NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
                             logger.error("Could not instantiate specified EContentRecord class", e);
                         }
@@ -92,6 +94,6 @@ public class EcontentRecordFactory {
         }
 
         //Default
-        return new EContentRecord(eContentRecordDAO, rs);
+        return new EContentRecord(eContentRecordDAO, rs, config);
     }
 }

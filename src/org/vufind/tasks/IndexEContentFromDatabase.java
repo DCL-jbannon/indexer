@@ -2,6 +2,8 @@ package org.vufind.tasks;
 
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.core.util.StatusPrinter;
+import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.impl.ConcurrentUpdateSolrServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vufind.ConnectionProvider;
@@ -10,11 +12,15 @@ import org.vufind.config.DynamicConfig;
 import org.vufind.config.sections.BasicConfigOptions;
 import org.vufind.config.sections.EContentConfigOptions;
 import org.vufind.config.sections.MarcConfigOptions;
+import org.vufind.econtent.EContentRecord;
 import org.vufind.econtent.FreegalImporter;
+import org.vufind.processors.EContentIndexer;
 import org.vufind.processors.IEContentProcessor;
 import org.vufind.processors.IMarcRecordProcessor;
+import org.vufind.solr.SolrUpdateServerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -63,8 +69,9 @@ public class IndexEContentFromDatabase {
     private void run() {
         Connection econtentConn = ConnectionProvider.getConnection(config,
                 ConnectionProvider.PrintOrEContent.E_CONTENT);
+        List<IEContentProcessor> econtentProcessors = null;
         try {
-            List<IEContentProcessor> econtentProcessors = loadProcessors();
+            econtentProcessors = loadProcessors();
 
             PreparedStatement econtentRecordStatement = econtentConn
                     .prepareStatement("SELECT * FROM econtent_record WHERE status = 'active'");
@@ -75,9 +82,24 @@ public class IndexEContentFromDatabase {
                     econtentProcessor.processEContentRecord(allEContent);
                 }
             }
+
+            ConcurrentUpdateSolrServer solrServer = SolrUpdateServerFactory.getSolrUpdateServer(config.get(BasicConfigOptions.BASE_SOLR_URL).toString()
+                    + config.get(BasicConfigOptions.ECONTENT_CORE).toString());
+            solrServer.blockUntilFinished();
+            try {
+                solrServer.commit();
+            } catch (SolrServerException |IOException e) {
+                logger.error("Could not commit to Solr", e);
+            }
+            int ii = 0;
+            ii++;
         } catch (SQLException ex) {
             // handle any errors
             logger.error("Unable to load econtent records from database", ex);
+            System.exit(1);
+        } catch ( Exception e) {
+            logger.error("Unknown error while indexing eContent", e);
+            System.exit(1);
         }
 
     }

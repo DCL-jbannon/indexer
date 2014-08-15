@@ -4,10 +4,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.solrmarc.tools.Utils;
 import org.vufind.*;
+import org.vufind.config.ConfigFiller;
 import org.vufind.config.DynamicConfig;
 import org.vufind.config.sections.BasicConfigOptions;
 import org.vufind.config.sections.MarcConfigOptions;
+import org.vufind.config.sections.OverDriveConfigOptions;
+import org.vufind.config.sections.UpdateResourcesConfigOptions;
 
+import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -69,6 +73,8 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 	public boolean init(DynamicConfig config) {
 		// Load configuration
         this.config = config;
+        ConfigFiller.fill(config, UpdateResourcesConfigOptions.values(), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
+
         Connection vufindConn = ConnectionProvider.getConnection(config, ConnectionProvider.PrintOrEContent.PRINT);
 
         try {
@@ -285,7 +291,9 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 			return true;
 		}
 
-        boolean updateUnchangedResources = config.getBool(BasicConfigOptions.DO_FULL_REINDEX);
+        boolean updateUnchangedResources =
+                config.getBool(BasicConfigOptions.DO_FULL_REINDEX)
+                && config.getBool(UpdateResourcesConfigOptions.UPDATE_UNCHANGED_MARC);
 		if (recordInfo.getRecordStatus() == MarcProcessor.RecordStatus.RECORD_UNCHANGED && !updateUnchangedResources){
 			boolean updateResource = false; 
 			BasicResourceInfo basicResourceInfo = existingResources.get(recordInfo.getId());

@@ -558,7 +558,7 @@ public class MarcProcessor {
 			if (useThreads){
 				ArrayList<MarcProcessorThread> indexingThreads = new ArrayList<MarcProcessorThread>();
 				for (final File marcFile : marcFiles) {
-                    logger.info("Processing on thread: " + marcFile.getAbsolutePath());
+                    logger.debug("Processing on thread: " + marcFile.getAbsolutePath());
 					MarcProcessorThread marcFileProcess = new MarcProcessorThread(recordProcessors, logger, marcFile);
 					indexingThreads.add(marcFileProcess);
 					marcFileProcess.start();
@@ -616,7 +616,7 @@ public class MarcProcessor {
                 logger.debug("Record is changed - backup econtent");
                 return RecordStatus.RECORD_CHANGED;
             } else {
-                // logger.info("Record is unchanged");
+                logger.debug("Record is unchanged");
                 return RecordStatus.RECORD_UNCHANGED;
             }
         } else {

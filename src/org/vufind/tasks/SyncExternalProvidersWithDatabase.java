@@ -19,6 +19,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 
 /**
  * Created by jbannon on 7/3/14.
@@ -55,12 +57,16 @@ public class SyncExternalProvidersWithDatabase {
     private void run() {
         StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
 
-        List<I_ExternalImporter> importers = loadImporters();
+        final List<I_ExternalImporter> importers = loadImporters();
 
         for(I_ExternalImporter importer: importers) {
             importer.init(config);
-            importer.importRecords();
         }
+
+        ForkJoinPool forkJoinPool = new ForkJoinPool(importers.size());
+        ForkJoinTask task = forkJoinPool.submit(()->
+                importers.parallelStream().forEach((importer) -> importer.importRecords()));
+        task.join();
     }
 
     private List<I_ExternalImporter> loadImporters() {

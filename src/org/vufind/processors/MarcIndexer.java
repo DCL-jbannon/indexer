@@ -35,10 +35,6 @@ public class MarcIndexer implements IMarcRecordProcessor {
     @Override
 	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
         logger.debug("Processing record: "+recordInfo.getId());
-        if(recordInfo.getId().equals("1118588") ) {
-            int ii = 0;
-            ii++;
-        }
 		try {
             MarcProcessor.RecordStatus recordStatus = recordInfo.getRecordStatus();
 			if (recordStatus == MarcProcessor.RecordStatus.RECORD_UNCHANGED
@@ -57,11 +53,10 @@ public class MarcIndexer implements IMarcRecordProcessor {
 					SolrInputDocument doc = recordInfo.getSolrDocument();
 					if (doc != null){
                         if(doc.getField("id")==null || doc.getField("id").equals("")) {
-                            int i = 0;
-                            i++;
                             logger.error("Solr Document didn't have an ID. Aborting add.");
                             return false;
                         }
+
                         getSolrUpdator().add(doc);
                         logger.debug("Added record[" + recordInfo.getId() + "]");
 						return true;

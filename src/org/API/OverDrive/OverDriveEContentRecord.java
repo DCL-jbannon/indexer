@@ -1,6 +1,11 @@
 package org.API.OverDrive;
 
 import org.json.simple.JSONObject;
+import org.vufind.config.ConfigFiller;
+import org.vufind.config.DynamicConfig;
+import org.vufind.config.sections.BasicConfigOptions;
+import org.vufind.config.sections.OdiloConfigOptions;
+import org.vufind.config.sections.OverDriveConfigOptions;
 import org.vufind.econtent.EContentRecord;
 import org.vufind.econtent.EContentRecordDAO;
 
@@ -16,12 +21,25 @@ import java.util.regex.Pattern;
  * Created by jbannon on 7/21/2014.
  */
 public class OverDriveEContentRecord extends EContentRecord {
-    public OverDriveEContentRecord(EContentRecordDAO eContentRecordDAO, ResultSet rs) throws SQLException {
-        super(eContentRecordDAO, rs);
+    public OverDriveEContentRecord(EContentRecordDAO eContentRecordDAO, ResultSet rs, DynamicConfig config) throws SQLException {
+        super(eContentRecordDAO, rs, config);
     }
 
-    public OverDriveEContentRecord(EContentRecordDAO eContentRecordDAO) throws SQLException {
-        super(eContentRecordDAO);
+    public OverDriveEContentRecord(EContentRecordDAO eContentRecordDAO, DynamicConfig config) throws SQLException {
+        super(eContentRecordDAO, config);
+    }
+
+    static private OverDriveAPIServices api = null;
+    public void init() {
+        if(api==null) {
+            ConfigFiller.fill(config,
+                    OverDriveConfigOptions.values(),
+                    new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
+            String clientKey = config.getString(OverDriveConfigOptions.CLIENT_KEY);
+            String clientSecret = config.getString(OverDriveConfigOptions.CLIENT_SECRET);
+            int libraryId = config.getInteger(OverDriveConfigOptions.LIBRARY_ID);
+            api = new OverDriveAPIServices(clientKey, clientSecret, libraryId);
+        }
     }
 
     @Override
@@ -56,6 +74,12 @@ public class OverDriveEContentRecord extends EContentRecord {
             return "OverDrive";
         }
 
+        if (name.equals("format")) {
+            Set<String> formats = getFormats(itemTypeFormatMap, api);
+            logger.debug("formats => " + formats);
+            return formats;
+        }
+
         return super.getSolrField(name, collectionGroupMap, itemTypeFormatMap, deviceCompatibilityMap, fullTextPath);
     }
 
@@ -64,18 +88,15 @@ public class OverDriveEContentRecord extends EContentRecord {
         if (formats != null) {
             return formats;
         }
+        // determine formats
+        formats = new HashSet<String>();
 
         String overDriveId = getOverDriveId();
         if (overDriveId != null) {
             Set<String> overDriveFormats = getOverDriveFormats(
                     overDriveAPIServices, overDriveId);
-            StringBuilder buf = new StringBuilder();
-            String separator = "";
-            for (String format : overDriveFormats) {
-                buf.append(separator + format);
-                separator = ", ";
-            }
-            formats.add(buf.toString());
+
+            formats.addAll(overDriveFormats);
         }
         return formats;
     }

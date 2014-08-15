@@ -1,5 +1,6 @@
 package org.vufind.processors;
 
+import org.API.OverDrive.OverDriveEContentRecord;
 import org.apache.solr.client.solrj.SolrServerException;
 import org.apache.solr.client.solrj.impl.ConcurrentUpdateSolrServer;
 import org.apache.solr.client.solrj.request.LukeRequest;
@@ -39,7 +40,8 @@ public class EContentIndexer implements IEContentProcessor {
 
 	@Override
 	public boolean processEContentRecord(ResultSet rs) {
-		EContentRecord record;
+		EContentRecord record = null;
+
 		try {
 			//record = new EContentRecord(new EContentRecordDAO(ConnectionProvider.getDataSource(config, ConnectionProvider.PrintOrEContent.E_CONTENT)), rs);
             record = EcontentRecordFactory.getRecordFactory(config).get(eContentRecordDAO, rs);
@@ -87,7 +89,9 @@ public class EContentIndexer implements IEContentProcessor {
         this.config = config;
 		fullTextPath = config.getString(EContentConfigOptions.COLLECTION_GROUP_MAP_PATH);
 
-        eContentRecordDAO = new EContentRecordDAO(ConnectionProvider.getDataSource(config, ConnectionProvider.PrintOrEContent.E_CONTENT));
+        eContentRecordDAO = new EContentRecordDAO(
+                ConnectionProvider.getDataSource(config, ConnectionProvider.PrintOrEContent.E_CONTENT),
+                config);
 		// Load Collection Group map
 		collectionGroupMap = new Properties();
 

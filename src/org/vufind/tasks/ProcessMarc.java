@@ -98,13 +98,18 @@ public class ProcessMarc {
         List<File> marcFiles = getMarcFiles();
         for(File marcFile : marcFiles) {
             InputStream input = null;
-            try {input = new FileInputStream(marcFile);} catch (FileNotFoundException e) {
+            try {
+                input = new FileInputStream(marcFile);
+                logger.info("Processing Marc File ["+marcFile.getName()+"]");
+            } catch (FileNotFoundException e) {
                 logger.error("Could not open file: " + marcFile.getAbsolutePath(), e);
+                break;
             }
+
             MarcReader reader = new MarcPermissiveStreamReader(input, true, true, "UTF8");
 
             List<MarcRecordDetails> records = null;
-            while((records = getNextRecords(reader, 1000)).size()>0) {
+            while((records = getNextRecords(reader, 10000)).size()>0) {
                 final CountingList<MarcRecordDetails> closedOverRecords = new CountingList(records);
 
                 System.out.println("------------------------\nAfter getting records");

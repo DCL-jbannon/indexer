@@ -14,6 +14,7 @@ import java.util.*;
 import org.apache.solr.common.SolrInputDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.vufind.config.DynamicConfig;
 
 public class EContentRecord {
 	protected static Logger logger = LoggerFactory.getLogger(EContentRecord.class);
@@ -22,12 +23,15 @@ public class EContentRecord {
 	private EContentRecordDAO dao = null;
 	protected Set<String> formats = null;
 
+    protected DynamicConfig config = null;
+
 	/**
 	 * Instantiate a new empty EContentRecord.
 	 */
-	public EContentRecord(EContentRecordDAO eContentRecordDAO) {
+	public EContentRecord(EContentRecordDAO eContentRecordDAO, DynamicConfig config) {
         this.properties = new HashMap<String, Object>();
 		this.dao = eContentRecordDAO;
+        this.config = config;
 	}
 
 	/**
@@ -37,8 +41,8 @@ public class EContentRecord {
 	 * @param rs
 	 * @throws SQLException
 	 */
-	public EContentRecord(EContentRecordDAO eContentRecordDAO, ResultSet rs) throws SQLException {
-		this(eContentRecordDAO);
+	public EContentRecord(EContentRecordDAO eContentRecordDAO, ResultSet rs, DynamicConfig config) throws SQLException {
+		this(eContentRecordDAO, config);
 		// fetch all the columns from current row
 		ResultSetMetaData metaData = rs.getMetaData();
 		int columnCount = metaData.getColumnCount();
@@ -50,6 +54,10 @@ public class EContentRecord {
 			}
 		}
 	}
+
+    public void init() {
+
+    }
 
 	/**
 	 * Get property.
@@ -131,6 +139,7 @@ public class EContentRecord {
 			Object value = getSolrField(name, collectionGroupMap,
 					itemTypeFormatMap, deviceCompatibilityMap,
                     fullTextPath);
+
 			if (value != null) {
 				doc.addField(name, value);
 			}
@@ -365,7 +374,9 @@ public class EContentRecord {
 				String format = translateValue(itemTypeFormatMap, type);
 				if (format != null) {
 					formats.add(format);
-				}
+				} else {
+                    formats.add(type);//is this ok?
+                }
 			}
 
 		} catch (Exception e) {

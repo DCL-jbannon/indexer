@@ -226,7 +226,7 @@ public class Util {
 			URL emptyIndexURL = new URL(url);
 			conn = (HttpURLConnection) emptyIndexURL.openConnection();
 			conn.setConnectTimeout(1000);
-			conn.setReadTimeout(30000);
+			conn.setReadTimeout(90000);
 			logger.debug("  Opened connection");
 			StringBuffer response = new StringBuffer();
 			if (conn.getResponseCode() == 200) {

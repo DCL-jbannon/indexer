@@ -86,7 +86,7 @@ public class MarcRecordDetails {
 	 * 
 	 * @return
 	 */
-	private boolean mapRecord() {
+	private synchronized boolean mapRecord() {
 		if (this.finishedMappingFields){
             return true;
         }
@@ -199,7 +199,7 @@ public class MarcRecordDetails {
 
 	public void loadUrls() {
 		if (urlsLoaded) return;
-		logger.info("Loading urls from 856 field");
+		logger.debug("Loading urls from 856 field");
 		@SuppressWarnings("unchecked")
 		List<VariableField> eightFiftySixFields = record.getVariableFields("856");
 		for (VariableField eightFiftySixField : eightFiftySixFields) {
@@ -1003,6 +1003,10 @@ public class MarcRecordDetails {
             id = (String)o;
         }
 
+        if(indexField.equals("system_list")) {
+            int ii = 0;
+            ii++;
+        }
 		Class<?> thisClass = this.getClass();
 		Object objectThatContainsMethod = this;
 		try {
@@ -2286,7 +2290,7 @@ public class MarcRecordDetails {
 		}
 
 		// check the Leader at position 6
-		if (leader.length() >= 6) {
+		if (leader.length() > 6) {
 			leaderBit = leader.charAt(6);
 			switch (Character.toUpperCase(leaderBit)) {
 			case 'C':
@@ -2331,7 +2335,7 @@ public class MarcRecordDetails {
 			return result;
 		}
 
-		if (leader.length() >= 7) {
+		if (leader.length() > 7) {
 			// check the Leader at position 7
 			leaderBit = leader.charAt(7);
 			switch (Character.toUpperCase(leaderBit)) {
@@ -2412,13 +2416,13 @@ public class MarcRecordDetails {
 																																																 */
 			) {
 				char targetAudienceChar;
-				if (ohOhSixField != null && ohOhSixField.getData().length() >= 5) {
+				if (ohOhSixField != null && ohOhSixField.getData().length() > 5) {
 					targetAudienceChar = Character.toUpperCase(ohOhSixField.getData().charAt(5));
 					if (targetAudienceChar != ' ') {
 						result.add(Character.toString(targetAudienceChar));
 					}
 				}
-				if (result.size() == 0 && ohOhEightField != null && ohOhEightField.getData().length() >= 22) {
+				if (result.size() == 0 && ohOhEightField != null && ohOhEightField.getData().length() > 22) {
 					targetAudienceChar = Character.toUpperCase(ohOhEightField.getData().charAt(22));
 					if (targetAudienceChar != ' ') {
 						result.add(Character.toString(targetAudienceChar));
@@ -2761,6 +2765,10 @@ public class MarcRecordDetails {
 		return null;
 	}
 
+    public Set<String> getSystemLists(String configFile) {
+        return SystemLists.getSystemLists(record, configFile);
+    }
+
 	public String checkSuppression(String locationField, String locationsToSuppress, String manualSuppressionField, String manualSuppressionValue) {
 		// If all locations should be suppressed, then the record should be
 		// suppressed.
@@ -2874,56 +2882,60 @@ public class MarcRecordDetails {
 		return result;
 	}
 
-	private Boolean												isEContent								= null;
-	private HashMap<String, DetectionSettings>	eContentDetectionSettings	= new HashMap<String, DetectionSettings>();
+    private Boolean isEContent = null;
+    private Object eContentLock = new Object();
+    private HashMap<String, DetectionSettings>	eContentDetectionSettings	= new HashMap<String, DetectionSettings>();
 
 	/*
 	 * Determine if the record is eContent or not.
 	 */
 	public boolean isEContent() {
-		if (isEContent == null) {
-			logger.debug("Checking if record is eContent");
-			isEContent = false;
-			// Treat the record as eContent if the records is:
-			// 1) It is already in the eContent database
-			// 2) It matches criteria in EContentRecordDetectionSettings
-			for (DetectionSettings curSettings : marcProcessor.getDetectionSettings()) {
-				Set<String> fieldData = getFieldList(curSettings.getFieldSpec());
-				boolean isMatch = false;
-				logger.debug("Found " + fieldData.size() + " fields matching " + curSettings.getFieldSpec());
-				for (String curField : fieldData) {
-					 //logger.debug("Testing if value -" + curField.toLowerCase() +
-					 //"- matches -" + curSettings.getValueToMatch().toLowerCase() + "-");
-					
-					 String textToMatch = ".*" + curSettings.getValueToMatch().toLowerCase() + ".*";
-					 textToMatch = textToMatch.replaceAll(Pattern.quote("+"), "\\\\+");
-					 
-					isMatch = ((String) curField.toLowerCase()).matches(textToMatch);
-					if (isMatch) break;
-				}
-				if (isMatch) {
-					isEContent = isMatch;
-					DetectionSettings detectionSettingsForSource = eContentDetectionSettings.get(curSettings.getSource());
-					if (detectionSettingsForSource == null){
-						eContentDetectionSettings.put(curSettings.getSource(), curSettings);
-					}
-				}
-			}
-			logger.debug("Finished checking detection settings");
-			logger.debug("Finished checking detection settings");
+		if (this.isEContent == null) {
+            synchronized(eContentLock) {
+                if(this.isEContent == null) {
+                    logger.debug("Checking if record is eContent");
+                    boolean isEContent = false;
+                    // Treat the record as eContent if the records is:
+                    // 1) It is already in the eContent database
+                    // 2) It matches criteria in EContentRecordDetectionSettings
+                    for (DetectionSettings curSettings : marcProcessor.getDetectionSettings()) {
+                        Set<String> fieldData = getFieldList(curSettings.getFieldSpec());
+                        boolean isMatch = false;
+                        logger.debug("Found " + fieldData.size() + " fields matching " + curSettings.getFieldSpec());
+                        for (String curField : fieldData) {
+                            logger.debug("Testing if value -" + curField.toLowerCase() +
+                                    "- matches -" + curSettings.getValueToMatch().toLowerCase() + "-");
 
-			if (!isEContent) {
-				String ilsId = this.getId();
-				if (marcProcessor.getExistingEContentIds().contains(ilsId)) {
-					logger.debug("Suppressing because there is an eContent record for " + ilsId);
-					isEContent = true;
-				}
-			}
-			logger.debug("Finished checking if record is eContent");
-			return isEContent;
-		} else {
-			return isEContent;
+                            String textToMatch = ".*" + curSettings.getValueToMatch().toLowerCase() + ".*";
+                            textToMatch = textToMatch.replaceAll(Pattern.quote("+"), "\\\\+");
+
+                            isMatch = ((String) curField.toLowerCase()).matches(textToMatch);
+                            if (isMatch) break;
+                        }
+                        if (isMatch) {
+                            isEContent = true;
+                            DetectionSettings detectionSettingsForSource = eContentDetectionSettings.get(curSettings.getSource());
+                            if (detectionSettingsForSource == null){
+                                eContentDetectionSettings.put(curSettings.getSource(), curSettings);
+                            }
+                        }
+                    }
+                    logger.debug("Finished checking detection settings");
+
+                    if (!isEContent) {
+                        String ilsId = this.getId();
+                        if (marcProcessor.getExistingEContentIds().contains(ilsId)) {
+                            logger.debug("Suppressing because there is an eContent record for " + ilsId);
+                            isEContent = true;
+                        }
+                    }
+                    logger.debug("Finished checking if record is eContent");
+                    this.isEContent = isEContent;
+                }
+            }
 		}
+
+        return this.isEContent;
 	}
 
 	public HashMap<String, DetectionSettings> getEContentDetectionSettings() {

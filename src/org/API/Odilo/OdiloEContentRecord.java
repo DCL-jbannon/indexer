@@ -2,6 +2,7 @@ package org.API.Odilo;
 
 import org.API.OverDrive.OverDriveAPIServices;
 import org.json.simple.JSONObject;
+import org.vufind.config.DynamicConfig;
 import org.vufind.econtent.EContentRecord;
 import org.vufind.econtent.EContentRecordDAO;
 
@@ -17,12 +18,12 @@ import java.util.regex.Pattern;
  * Created by jbannon on 7/21/2014.
  */
 public class OdiloEContentRecord extends EContentRecord {
-    public OdiloEContentRecord(EContentRecordDAO eContentRecordDAO, ResultSet rs) throws SQLException {
-        super(eContentRecordDAO, rs);
+    public OdiloEContentRecord(EContentRecordDAO eContentRecordDAO, ResultSet rs, DynamicConfig config) throws SQLException {
+        super(eContentRecordDAO, rs, config);
     }
 
-    public OdiloEContentRecord(EContentRecordDAO eContentRecordDAO) throws SQLException {
-        super(eContentRecordDAO);
+    public OdiloEContentRecord(EContentRecordDAO eContentRecordDAO, DynamicConfig config) throws SQLException {
+        super(eContentRecordDAO, config);
     }
 
     @Override

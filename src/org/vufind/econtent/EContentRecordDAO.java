@@ -10,12 +10,15 @@ import java.util.Set;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.vufind.config.DynamicConfig;
 
 /**
  * Data access object for the EContentRecord.
  */
 public class EContentRecordDAO {
     final static Logger logger = LoggerFactory.getLogger(EContentRecordDAO.class);
+
+    private DynamicConfig config;
     private static EContentRecordDAO instance = null;
 
 	private BasicDataSource dataSource = null;
@@ -24,10 +27,11 @@ public class EContentRecordDAO {
 	private final Map<Long, Double> ratingsCache;
 	private final Map<Long, List<String>> itemTypesCache;
 
-	public EContentRecordDAO(BasicDataSource dataSource) {
+	public EContentRecordDAO(BasicDataSource dataSource, DynamicConfig config) {
         this.ratingsCache = new HashMap<Long, Double>();
         this.itemTypesCache = new HashMap<Long, List<String>>();
         this.dataSource = dataSource;
+        this.config = config;
 	}
 
 	/**
@@ -113,7 +117,7 @@ public class EContentRecordDAO {
         this.getRecordPS.setLong(1, id);
 		ResultSet rs = this.getRecordPS.executeQuery();
 		if (rs.first()) {
-			record = new EContentRecord(this, rs);
+			record = new EContentRecord(this, rs, config);
 		}
 		rs.close();
 		return record;
@@ -129,7 +133,8 @@ public class EContentRecordDAO {
                     "SELECT * FROM econtent_record WHERE lower(source)='freegal'");
             ResultSet rs = this.getAllFreegalRecordPS.executeQuery();
             while (rs.next()) {
-                allRecords.put( getAllRecordsKey(rs.getString("title"),rs.getString("author")), new EContentRecord(this, rs));
+                allRecords.put( getAllRecordsKey(rs.getString("title"),rs.getString("author")),
+                        new EContentRecord(this, rs, config));
             }
             rs.close();
         }
@@ -438,7 +443,7 @@ public class EContentRecordDAO {
             connection = getActiveConnection(connection);
 			// load item types for all records into a map for quick lookup
 			PreparedStatement stmt = connection
-					.prepareStatement("select recordId,item_type from econtent_item order by recordId,id");
+					.prepareStatement("select distinct recordId,item_type from econtent_item order by recordId,id");
 			ResultSet rs = stmt.executeQuery();
 			Long currentId = null;
 			while (rs.next()) {
