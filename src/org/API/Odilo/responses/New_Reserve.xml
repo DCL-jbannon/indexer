@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<response>
+    <response xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="reserve">
+        <recordId>00005984</recordId>
+        <reserveId>000000045</reserveId>
+        <status>waiting</status>
+    </response>
+    <session>57B009B0F6CA9F5C199FDC9ED6F18E74</session>
+</response>

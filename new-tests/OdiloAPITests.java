@@ -1,16 +1,14 @@
 import org.API.Odilo.OdiloAPI;
-import org.API.Odilo.models.LoanablesType;
-import org.API.OverDrive.IOverDriveAPIWrapper;
-import org.API.OverDrive.OverDriveAPI;
-import org.json.simple.JSONArray;
+import org.API.Odilo.manualModels.GetLoanablesResponse;
+import org.API.Odilo.manualModels.ReserveResponse;
 import org.json.simple.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.io.File;
+import java.io.FileReader;
+import java.io.InputStream;
+import java.util.*;
 
 /**
  * Created by jbannon on 8/12/2014.
@@ -21,7 +19,11 @@ public class OdiloAPITests {
     @Before
     public void setUp() throws Exception
     {
-        this.api = new OdiloAPI("http://www.evokecolorado.org", "Monique1", "Monique1");
+        Properties p = new Properties();
+        InputStream in = this.getClass().getResourceAsStream("evokeTest.properties");
+        p.load(in);
+        in.close();
+        this.api = new OdiloAPI( p.get("url").toString(), p.get("user").toString(), p.get("pass").toString());
         this.api.login();
     }
 
@@ -34,7 +36,7 @@ public class OdiloAPITests {
         int len = 4;
         int ran = rand.nextInt(ids.size()-len);
 
-        List<LoanablesType> list = this.api.getCheckoutOptionsForRecords(ids.subList(ran, ran+len));
+        List<GetLoanablesResponse> list = this.api.getCheckoutOptionsForRecords(ids.subList(ran, ran+len));
         int ii = 0;
         assert(list.size() == len);
 
@@ -64,7 +66,11 @@ public class OdiloAPITests {
 
         Map<String, String> map = new HashMap();
 
-        for(String id : ids) {
+        Random rand = new Random();
+        int len = 4;
+        int ran = rand.nextInt(ids.size()-len);
+
+        for(String id : ids.subList(ran, ran+len)) {
             String isbn = this.api.getISBN(id);
             if(isbn != null) {
                 map.put(id, isbn);
@@ -77,6 +83,33 @@ public class OdiloAPITests {
         //assert(res.containsKey("leader"));
     }
 
+    @Test
+    public void test_makeHold() {
+        List<String> ids = this.api.getIds();
+        assert(ids.size()>0);
+
+        Random rand = new Random();
+        int ran = rand.nextInt(ids.size());
+
+        String recordId = ids.get(ran);
+        GetLoanablesResponse loanablesResponse = this.api.getCheckoutOptionsForRecord(recordId);
+        assert(loanablesResponse != null);
+
+        ReserveResponse rt = this.api.holdItem(recordId, loanablesResponse.getRecordId());
+        assert(rt.getRecordId()!=null);
+        assert(rt.getReserveId()!=null);
+         int ii = 0;
+    }
+
+    @Test
+    public void test_releaseAllHolds() {
+
+        List<ReserveResponse> reserveList = this.api.getHolds();
+        for(ReserveResponse reserve : reserveList) {
+
+            this.api.releaseHold(reserve);
+        }
+    }
 
 
 }

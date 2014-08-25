@@ -1,0 +1,40 @@
+{
+    "type":"object",
+    "$schema": "http://json-schema.org/draft-03/schema",
+    "id": "http://jsonschema.net",
+    "required":false,
+    "properties":{
+        "response": {
+            "type":"object",
+            "id": "http://jsonschema.net/response",
+            "required":false,
+            "properties":{
+                "@type": {
+                    "type":"string",
+                    "id": "http://jsonschema.net/response/@type",
+                    "required":false
+                },
+                "recordId": {
+                    "type":"string",
+                    "id": "http://jsonschema.net/response/recordId",
+                    "required":false
+                },
+                "reserveId": {
+                    "type":"string",
+                    "id": "http://jsonschema.net/response/reserveId",
+                    "required":false
+                },
+                "status": {
+                    "type":"string",
+                    "id": "http://jsonschema.net/response/status",
+                    "required":false
+                }
+            }
+        },
+        "session": {
+            "type":"string",
+            "id": "http://jsonschema.net/session",
+            "required":false
+        }
+    }
+}

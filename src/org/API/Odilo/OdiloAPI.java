@@ -1,6 +1,7 @@
 package org.API.Odilo;
 
-import org.API.Odilo.models.*;
+import org.API.Odilo.manualModels.GetLoanablesResponse;
+import org.API.Odilo.manualModels.ReserveResponse;
 import org.eclipse.persistence.jaxb.rs.MOXyJsonProvider;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -11,10 +12,10 @@ import org.slf4j.LoggerFactory;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.client.*;
 import javax.ws.rs.core.Cookie;
-import javax.ws.rs.core.GenericType;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Future;
@@ -138,32 +139,128 @@ public class OdiloAPI
         return null;
     }
 
-    public List<LoanablesType> getCheckoutOptionsForRecords(List<String> recordIds)
-    {
-        final List<LoanablesType> ret = Collections.synchronizedList(new ArrayList<>());
+    public ReserveResponse holdItem(String recordId, String loanableId) {
+        WebTarget target = client.target(url+ "/rest/v1/LoanService/New_Reserve")
+                .queryParam("recordId", recordId);
+                //.queryParam("loanableId", loanableId);
 
-        final List<Integer> counter = new ArrayList<>();
-        counter.add(0);
+        Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_JSON_TYPE);
 
-        InvocationCallback callback = new InvocationCallback<LoanablesType>() {
-            @Override
-            public void completed(LoanablesType response) {
-                ret.add(response);
-                /*
-                counter.set(0, counter.get(0)+1);
-                System.out.println("Response status code " + response.getStatus() + " received.");
-                int j = 0;
-                try{
-                    j++;
-                    LoanablesType lt = response.readEntity(LoanablesType.class);
-                    ret.add(lt);
-                }catch (Exception e) {
-                    e.printStackTrace();
-                    logger.error("Couldn't marshal response", e);
+        //ResponseType response = invocationBuilder.get(String.class);
+        String response = invocationBuilder.get(String.class);
+        try {
+            Object o = JSONValue.parse(response);
+            if(o instanceof JSONObject) {
+                JSONObject jsonResp = (JSONObject) o;
+                jsonResp = (JSONObject)jsonResp.get("response");
+                return new ReserveResponse(
+                        jsonResp.get("recordId").toString(),
+                        jsonResp.get("reserveId").toString(),
+                        jsonResp.get("status").toString());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    public List<ReserveResponse> getHolds() {
+        WebTarget target = client.target(url + "/rest/v1/LoanService/Get_Reserves");
+        //.queryParam("loanableId", loanableId);
+
+        Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_JSON_TYPE);
+
+        //ResponseType response = invocationBuilder.get(String.class);
+        String response = invocationBuilder.get(String.class);
+        try {
+            Object o = JSONValue.parse(response);
+            if(o instanceof JSONObject) {
+                JSONObject jsonResp = (JSONObject) o;
+                jsonResp = (JSONObject)jsonResp.get("response");
+                List<ReserveResponse> l = new ArrayList();
+                Object reservesO = jsonResp.get("reserves");
+                if(reservesO instanceof JSONArray){
+                    JSONArray jsonArray = (JSONArray) reservesO;
+                    for(Object oo : jsonArray) {
+                        if(oo instanceof JSONObject) {
+                            JSONObject reserveJO = (JSONObject) oo;
+                            l.add( new ReserveResponse(
+                                    reserveJO.get("recordId").toString(),
+                                    reserveJO.get("reserveId").toString(),
+                                    reserveJO.get("status").toString()) );
+                        }
+                    }
                 }
 
-                int ii = 0;
-                ii++;    */
+                return l;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    public void releaseHold(ReserveResponse reserve) {
+        WebTarget target = client.target(url + "/rest/v1/LoanService/Remove_Reserve")
+            .queryParam("reserveId", reserve.getReserveId());
+
+        Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_JSON_TYPE);
+
+        //ResponseType response = invocationBuilder.get(String.class);
+        String response = invocationBuilder.get(String.class);
+        int i = 0;
+        i++;
+    }
+
+    public GetLoanablesResponse getCheckoutOptionsForRecord(String recordId)
+    {
+        List<GetLoanablesResponse> l = getCheckoutOptionsForRecords(Arrays.asList(recordId));
+        if(l.size()>0) {
+            return l.get(0);
+        } else {
+            return null;
+        }
+
+    }
+
+    public List<GetLoanablesResponse> getCheckoutOptionsForRecords(List<String> recordIds)
+    {
+        final List<GetLoanablesResponse> ret = Collections.synchronizedList(new ArrayList<>());
+
+        final List<String> responseString = Collections.synchronizedList(new ArrayList<>());
+        final List<Integer> counter = Collections.synchronizedList(new ArrayList<>());
+        counter.add(0);
+
+        /*InvocationCallback callback = new InvocationCallback<String>() {
+            @Override
+            public void completed(String response) {
+                counter.set(0, counter.get(0)+1);
+                responseString.add(response);
+                try {
+                    JSONObject retJO = (JSONObject) ((JSONObject) JSONValue.parse(response)).get("loanable");
+                    responseString.add("Got retJO");
+
+                    List<String> types = new ArrayList();
+                    Object typesO = retJO.get("types");
+                    if(typesO instanceof JSONArray) {
+                        JSONArray typesJA = (JSONArray) typesO;
+                        for(Object o : typesJA ) {
+                            types.add(o.toString());
+                        }
+                    } else {
+                        types.add(typesO.toString());
+                    }
+
+                    GetLoanablesResponse glResponse = new GetLoanablesResponse(
+                            retJO.get("recordId").toString(),
+                            types);
+                    ret.add(glResponse);
+                } catch (Exception e) {
+                    responseString.add(e.getMessage());
+                    e.printStackTrace();
+                }
             }
 
             @Override
@@ -171,32 +268,52 @@ public class OdiloAPI
                 System.out.println("Invocation failed.");
                 throwable.printStackTrace();
             }
-        };
+        }; */
 
         List<Future> futures = new ArrayList<Future>();
 
-        int i = 0;
         for(String recordId : recordIds) {
             WebTarget target = client.target(url+ "/rest/v1/RecordService/Get_Loanables")
                     .queryParam("recordId", recordId);
 
-            Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_XML_TYPE);
+            Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_JSON_TYPE);
             if(false) {
                 //ARGHGHGH! freakin frustrating. Something is messing up the async calls, but we can't seem to catch
                 //the exception.
-                LoanablesType lt = invocationBuilder.get(LoanablesType.class);
-                ret.add(lt);
+                invocationBuilder.get(String.class);
+                //ret.add(lt);
             } else {
-                futures.add(callFromBuilder(invocationBuilder, callback, HttpMethod.GET));
+                futures.add(callFromBuilder(invocationBuilder, HttpMethod.GET));
             }
-
-            i++;
         }
 
         //finish them up
         for(Future f : futures) {
             try {
-                f.get();
+                Object resO = f.get();
+                if(resO instanceof Response) {
+                    Response resp = (Response) resO;
+                    String respS = resp.readEntity(String.class);
+                    JSONObject retJO = (JSONObject) ((JSONObject) JSONValue.parse(respS)).get("loanable");
+                    responseString.add("Got retJO");
+
+                    List<String> types = new ArrayList();
+                    Object typesO = retJO.get("types");
+                    if(typesO instanceof JSONArray) {
+                        JSONArray typesJA = (JSONArray) typesO;
+                        for(Object o : typesJA ) {
+                            types.add(o.toString());
+                        }
+                    } else {
+                        types.add(typesO.toString());
+                    }
+
+                    GetLoanablesResponse glResponse = new GetLoanablesResponse(
+                            retJO.get("recordId").toString(),
+                            types);
+                    ret.add(glResponse);
+                }
+
             } catch(Exception e) {
                 logger.error("Error while getting loanable", e);
             }
@@ -218,6 +335,14 @@ public class OdiloAPI
         if(method.equals(HttpMethod.GET)) {
             return builder.async().get(callback);
         }//TODO we may need more methods in the future, but right now Odilo is only using GET
+
+        return null;
+    }
+
+    private Future<Response> callFromBuilder(Invocation.Builder builder, String method) {
+        if(method.equals(HttpMethod.GET)) {
+            return builder.async().get();
+        }
 
         return null;
     }
