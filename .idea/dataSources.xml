@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="DataSourceManagerImpl" format="xml" hash="3779217313">
+    <data-source source="LOCAL" name="MySQL - dclecontent_prod@VuFindMYSQL02.dcl.lan" uuid="eb8a0561-ca8d-467a-8bdf-07bb85f1e7ff">
+      <driver-ref>mysql</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>com.mysql.jdbc.Driver</jdbc-driver>
+      <jdbc-url>jdbc:mysql://VuFindMYSQL02.dcl.lan:3306/dclecontent_prod</jdbc-url>
+      <user-name>dclvufind</user-name>
+      <user-password>dfeedfc9dfe6dfdcdfccdf8bdfc4dfce</user-password>
+      <schema-pattern>dclecontent_prod.* dclvufind_prod.*</schema-pattern>
+      <default-schemas>dclecontent_prod.* dclvufind_prod.*</default-schemas>
+      <driver-properties>
+        <property name="zeroDateTimeBehavior" value="convertToNull" />
+        <property name="tinyInt1isBit" value="false" />
+      </driver-properties>
+      <libraries />
+    </data-source>
+  </component>
+</project>
+

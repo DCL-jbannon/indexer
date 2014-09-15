@@ -1,6 +1,14 @@
 package org.API.Freegal;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URL;
+import java.nio.channels.Channel;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -10,6 +18,8 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.apache.commons.io.IOUtils;
+import org.apache.noggit.JSONWriter;
 import org.vufind.econtent.Album;
 import org.vufind.econtent.Song;
 import org.slf4j.Logger;
@@ -19,6 +29,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
 public class FreegalAPI {
@@ -73,11 +84,32 @@ public class FreegalAPI {
 				+ base64Genre;
 		logger.debug("Get songs from genre url: " + songUrl);
 		Document songsDoc = null;
-		try {
-			DocumentBuilder songsDB = documentBuilderFactory.newDocumentBuilder();
+        DocumentBuilder songsDB = documentBuilderFactory.newDocumentBuilder();
+        ByteArrayOutputStream baos = null;
+        //File tempFile = File.createTempFile("Freegal_"+((int)Math.random()*1000), ".tmp");
+        try {
 			songsDoc = songsDB.parse(songUrl);
-		} catch (java.io.IOException e) {
+            /*URL url = new URL(songUrl);
+            ReadableByteChannel rbc = Channels.newChannel(url.openStream());
+            FileOutputStream fos = new FileOutputStream(tempFile);
+            fos.getChannel().transferFrom(rbc, 0, Integer.MAX_VALUE);
+            fos.close();
+            rbc.close();
+            //TODO this is temporary for debugging purposes; we should just read the URL stream straight via SAX
+            songsDoc = songsDB.parse(tempFile);     */
+		} catch (SAXException | IOException e) {
 			logger.error("Error while reading Freegal URL", e);
+            try {
+                Thread.sleep(4000);
+            } catch (InterruptedException e1) {
+                e1.printStackTrace();
+            }
+            try {
+
+                songsDoc = songsDB.parse(songUrl);
+            } catch (SAXException | IOException ee) {
+                logger.error("Failed twice to read Freegal URL", ee);
+            }
 			return albums.values();
 		}
 		NodeList songs = songsDoc.getElementsByTagName("Song");

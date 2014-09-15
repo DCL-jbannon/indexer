@@ -61,20 +61,20 @@ public class OdiloEContentRecord extends EContentRecord {
         return super.getSolrField(name, collectionGroupMap, itemTypeFormatMap, deviceCompatibilityMap, fullTextPath);
     }
 
-    private String getOdiloId() {
-        String sourceUrl = getString("sourceUrl");
-        if (sourceUrl == null || sourceUrl.length() == 0) {
-            return null;
-        }
-        Pattern Regex = Pattern.compile(
-                "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}",
-                Pattern.CANON_EQ);
-        Matcher RegexMatcher = Regex.matcher(sourceUrl);
-        String OdiloId = null;
-        if (RegexMatcher.find()) {
-            OdiloId = RegexMatcher.group();
-        }
-        return OdiloId;
-    }
+//    private String getOdiloId() {
+//        String sourceUrl = getString("sourceUrl");
+//        if (sourceUrl == null || sourceUrl.length() == 0) {
+//            return null;
+//        }
+//        Pattern Regex = Pattern.compile(
+//                "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}",
+//                Pattern.CANON_EQ);
+//        Matcher RegexMatcher = Regex.matcher(sourceUrl);
+//        String OdiloId = null;
+//        if (RegexMatcher.find()) {
+//            OdiloId = RegexMatcher.group();
+//        }
+//        return OdiloId;
+//    }
 
 }

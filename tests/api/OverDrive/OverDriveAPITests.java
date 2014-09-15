@@ -178,7 +178,7 @@ public class OverDriveAPITests {
 	}
 	
 	/**
-	 * method getItemMetadata
+	 * method getRecord
 	 * when called
 	 * should executesCorrectly
 	 * @throws Exception 

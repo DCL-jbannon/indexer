@@ -10,6 +10,7 @@ import java.util.function.Function;
  */
 public enum ExtractEContentConfigOptions implements I_ConfigOption {
     UPDATE_UNCHANGED_MARC(ConfigMethods::fillBool, false),
+    GUTENBERG_ITEM_FILE(ConfigMethods::fillSimpleString, false),
     ;
 
     final private Function fillFunction;

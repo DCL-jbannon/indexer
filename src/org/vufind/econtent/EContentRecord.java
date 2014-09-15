@@ -98,6 +98,24 @@ public class EContentRecord {
 		}
 	}
 
+    /**
+     * Get property.
+     *
+     * @param name
+     * @return
+     */
+    public Long getLong(String name) {
+        String val = getString(name);
+        if (val == null) {
+            return null;
+        }
+        try {
+            return Long.valueOf(val);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
 	/**
 	 * Set property.
 	 * 

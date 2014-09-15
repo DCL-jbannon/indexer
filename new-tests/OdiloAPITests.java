@@ -1,13 +1,14 @@
 import org.API.Odilo.OdiloAPI;
-import org.API.Odilo.manualModels.GetLoanablesResponse;
-import org.API.Odilo.manualModels.ReserveResponse;
-import org.json.simple.JSONObject;
+import org.API.Odilo.manualModels.*;
 import org.junit.Before;
 import org.junit.Test;
+import org.marc4j.MarcXmlHandler;
+import org.marc4j.MarcXmlParser;
+import org.marc4j.RecordStack;
+import org.xml.sax.InputSource;
 
-import java.io.File;
-import java.io.FileReader;
 import java.io.InputStream;
+import java.io.StringReader;
 import java.util.*;
 
 /**
@@ -29,14 +30,14 @@ public class OdiloAPITests {
 
     @Test
     public void test_getLoanables() throws Exception {
-        List<String> ids = this.api.getIds();
+        Set<String> ids = this.api.getAllIds();
         assert(ids.size()>0);
 
         Random rand = new Random();
         int len = 4;
         int ran = rand.nextInt(ids.size()-len);
 
-        List<GetLoanablesResponse> list = this.api.getCheckoutOptionsForRecords(ids.subList(ran, ran+len));
+        List<GetLoanablesResponse> list = this.api.getCheckoutOptionsForRecords(new ArrayList(ids).subList(ran, ran+len));
         int ii = 0;
         assert(list.size() == len);
 
@@ -46,21 +47,23 @@ public class OdiloAPITests {
     @Test
     public void test_getRecord() throws Exception {
 
-        List<String> ids = this.api.getIds();
+        List<String> ids = new ArrayList(this.api.getAllIds());
         assert(ids.size()>0);
 
         Random rand = new Random();
         int ran = rand.nextInt(ids.size());
 
-        JSONObject res = this.api.getItemMetadata(ids.get(ran));
-        assert(res != null);
-        assert(res.containsKey("leader"));
+        Record record = this.api.getRecord(ids.get(ran));
+
+
+        int i = 0;
+        i++;
     }
 
     @Test
     public void test_getISBNs() throws Exception {
 
-        List<String> ids = this.api.getIds();
+        List<String> ids = new ArrayList(this.api.getAllIds());
         assert(ids.size()>0);
 
 
@@ -85,7 +88,7 @@ public class OdiloAPITests {
 
     @Test
     public void test_makeHold() {
-        List<String> ids = this.api.getIds();
+        List<String> ids = new ArrayList(this.api.getAllIds());
         assert(ids.size()>0);
 
         Random rand = new Random();
@@ -111,5 +114,56 @@ public class OdiloAPITests {
         }
     }
 
+    @Test
+    public void test_makeCheckout() {
 
+        List<String> ids = new ArrayList(this.api.getAllIds());
+        assert(ids.size()>0);
+
+        Random rand = new Random();
+        int ran = rand.nextInt(ids.size());
+
+        String recordId = ids.get(ran);
+        LoanResponse loanResponse = this.api.checkout(recordId);
+
+        assert(loanResponse!=null);
+    }
+
+    @Test
+    public void test_returnCheckouts() {
+
+        List<String> ids = new ArrayList(this.api.getAllIds());
+        assert(ids.size()>0);
+
+        Random rand = new Random();
+        int ran = rand.nextInt(ids.size());
+
+        String recordId = ids.get(ran);
+        List<CheckoutInformation> checkouts = this.api.getCheckedOut();
+
+        for(CheckoutInformation checkout : checkouts) {
+            this.api.returnCheckout(checkout);
+        }
+
+        assert(checkouts!=null);
+    }
+
+    @Test
+    public void test_getCheckoutHistory() {
+
+        Object o = this.api.getCheckoutHistory();
+
+
+        assert(o!=null);
+    }
+
+    @Test
+    public void test_releaseHolds() {
+
+        List<ReserveResponse> reserveList = this.api.getHolds();
+        for(ReserveResponse reserve : reserveList) {
+
+            this.api.releaseHold(reserve);
+        }
+    }
 }

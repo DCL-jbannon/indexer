@@ -1,23 +1,32 @@
 package org.API.Odilo;
 
-import org.API.Odilo.manualModels.GetLoanablesResponse;
-import org.API.Odilo.manualModels.ReserveResponse;
+import org.API.Odilo.manualModels.*;
 import org.eclipse.persistence.jaxb.rs.MOXyJsonProvider;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.client.*;
 import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.*;
+import java.io.IOException;
+import java.io.StringReader;
+import java.net.URL;
+import java.util.*;
 import java.util.concurrent.Future;
 
 public class OdiloAPI
@@ -65,15 +74,22 @@ public class OdiloAPI
         return builder;
     }
 
-	public List<String> getIds()
+	public Set<String> getAllIds()
 	{
-        //TODO we'll have to refine this when we have a significant number of items in Odilo
-        WebTarget target = client.target(url + "/rest/v1/SearchService/Search")
-                .queryParam("Query", "*");
+        return getUpdatesSince(new DateTime().minusYears(20));
+	}
+
+    private DateTimeFormatter getUpdateDateFormatter = DateTimeFormat.forPattern("dd/MM/Y");
+    public Set<String> getUpdatesSince(DateTime since)
+    {
+        WebTarget target = client.target(url + "/rest/v1/SearchService/BoundedSearch")
+                .queryParam("ini", getUpdateDateFormatter.print(since))
+                .queryParam("end", getUpdateDateFormatter.print(new DateTime()))
+                .queryParam("limit", 1000);
         Invocation.Builder invocationBuilder = getBuilder(target);
         Response response = invocationBuilder.get();
         Object jResponse = JSONValue.parse(response.readEntity(String.class));
-        List<String> ret = new ArrayList();
+        Set<String> ret = new HashSet<>();
         if(jResponse instanceof JSONObject) {
             JSONObject jObject = (JSONObject) jResponse;
             Object v = jObject.get("recordId");
@@ -84,21 +100,121 @@ public class OdiloAPI
                 }
             }
         }
+        if(ret.size()>=1000) {
+            DateTime latestDt = null;
+            ret.addAll(getUpdatesSince(latestDt));
+        }
         return ret;
-	}
+    }
 	
-	public JSONObject getItemMetadata(String odiloId)
+	public Record getRecord(String odiloId)
 	{
         WebTarget target = client.target(url+ "/rest/v1/RecordService/Get_Record")
             .queryParam("recordId", odiloId);
-        Invocation.Builder invocationBuilder = getBuilder(target);
+        Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_XML_TYPE);
         Response response = invocationBuilder.get();
-        Object jResponse = JSONValue.parse(response.readEntity(String.class));
-        if(jResponse instanceof  JSONObject) {
-            return (JSONObject)jResponse;
-        }
-        return null;
+
+        Record record = getRecordFromString(response.readEntity(String.class));
+        record.setExternalId(odiloId);
+
+        return record;
 	}
+
+    private XPathFactory xPathfactory = XPathFactory.newInstance();
+    private XPath xpath = xPathfactory.newXPath();
+
+    synchronized private Record getRecordFromString(String xmlString) {
+        Document doc = getXMLDocumentFromString(new InputSource(new StringReader(xmlString)));
+        XPathExpression isbnX = null;
+        XPathExpression titleX = null;
+        XPathExpression subtitleX = null;
+        XPathExpression descriptionX = null;
+        XPathExpression authorX = null;
+        XPathExpression subjectX = null;
+        XPathExpression publisherX = null;
+        XPathExpression editionX = null;
+        XPathExpression targetAudienceX = null;
+        XPathExpression publishDateX = null;
+
+        try {
+            isbnX = xpath.compile("/record/datafield[@tag='020']/subfield[@code='a']");
+            titleX = xpath.compile("/record/datafield[@tag='245']/subfield[@code='a']");
+            subtitleX = xpath.compile("/record/datafield[@tag='245']/subfield[@code='b']");
+            descriptionX = xpath.compile("/record/datafield[@tag='520']/subfield[@code='a']");
+            authorX = xpath.compile("/record/datafield[@tag='245']/subfield[@code='c']");
+            subjectX = xpath.compile("(/record/datafield[@tag='650']/subfield[@code='a'])[1]");
+            publisherX = xpath.compile("(/record/datafield[@tag='260']/subfield[@code='b'])[1]");
+            editionX = xpath.compile("(/record/datafield[@tag='250']/subfield[@code='a'])[1]");
+            publishDateX = xpath.compile("(/record/datafield[@tag='260']/subfield[@code='c'])[1]");
+            //TargetAudience hasn't been tested because none of the Odilo mrc seems to have this field yet,
+            //but it should work if available
+            targetAudienceX = xpath.compile("(/record/datafield[@tag='521']/subfield)[1]");
+        } catch (XPathExpressionException e) {
+            e.printStackTrace();
+        }
+        try {
+            String isbn = cleanupMrcString((String)isbnX.evaluate(doc, XPathConstants.STRING));
+            String description = (String)descriptionX.evaluate(doc, XPathConstants.STRING);
+            String author = cleanupMrcString((String) authorX.evaluate(doc, XPathConstants.STRING));
+            String subject = cleanupMrcString((String) subjectX.evaluate(doc, XPathConstants.STRING));
+            String title = cleanupMrcString((String) titleX.evaluate(doc, XPathConstants.STRING));
+            String subtitle = cleanupMrcString((String) subtitleX.evaluate(doc, XPathConstants.STRING));
+            String language = "English"; //WTH? It seems like Marc doesn't track language
+            String publisher = cleanupMrcString((String) publisherX.evaluate(doc, XPathConstants.STRING));
+            String edition = cleanupMrcString((String) editionX.evaluate(doc, XPathConstants.STRING));
+            String targetAudience = cleanupMrcString((String) targetAudienceX.evaluate(doc, XPathConstants.STRING));
+            String publishDate = cleanupMrcString((String) publishDateX.evaluate(doc, XPathConstants.STRING));
+            if(publishDate.startsWith("c")) {
+                publishDate = publishDate.substring(1);
+            }
+            //String externalId = recordId;//TODO let's set externalId outside of this function
+
+            return new Record(isbn, description, author, subject, title, subtitle, language, publisher, edition,
+                    targetAudience, publishDate);
+
+        } catch (XPathExpressionException e) {
+            logger.error("Could not extract from Odilo Marc", e);
+        }
+
+        return null;
+    }
+
+    private String cleanupMrcString(String in) {
+        in = in.trim();
+        if(in.length()<1) {
+            return "";
+        }
+
+        char last = in.charAt(in.length() - 1);
+        switch(last) {
+            case '.':
+            case ',':
+            case '/':
+                return cleanupMrcString(in.substring(0, in.length()-1));
+        }
+        return in;
+    }
+
+    private DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    private DocumentBuilder builder = null;
+
+    synchronized private Document getXMLDocumentFromString(InputSource xmlSource) {
+        if(builder == null) {
+            try {
+                builder = factory.newDocumentBuilder();
+            } catch (ParserConfigurationException e) {
+                logger.error("Could not make DocumentBuilder", e);
+            }
+        }
+
+        try {
+            return builder.parse(xmlSource);
+        } catch (SAXException | IOException e) {
+            logger.error("Could not parse XMLDocument", e);
+        }
+
+        return null;
+    }
 
     public String getISBN(String odiloId)
     {
@@ -214,6 +330,100 @@ public class OdiloAPI
         i++;
     }
 
+    public LoanResponse checkout(String recordId) {
+        WebTarget target = client.target(url + "/rest/v1/LoanService/New_Loan")
+            .queryParam("recordId", recordId);
+
+        Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_JSON_TYPE);
+
+        //ResponseType response = invocationBuilder.get(String.class);
+        String response = invocationBuilder.get(String.class);
+        try {
+            Object o = JSONValue.parse(response);
+            if(o instanceof JSONObject) {
+                JSONObject jsonResp = (JSONObject) o;
+                jsonResp = (JSONObject)jsonResp.get("response");
+                List<URL> l = new ArrayList();
+                Object urlsO = jsonResp.get("urlsDownload");
+                if(urlsO instanceof JSONArray){
+                    JSONArray urlsJA = (JSONArray) urlsO;
+                    for(Object urlO : urlsJA) {
+                        if(urlO instanceof String) {
+                            URL url = new URL((String) urlO);
+                            l.add(url);
+                        }
+                    }
+                }
+
+                return new LoanResponse(recordId, l);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    public List<CheckoutInformation> getCheckedOut() {
+        WebTarget target = client.target(url + "/rest/v1/LoanService/Get_Active_Loans");
+
+        Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_JSON_TYPE);
+
+        //ResponseType response = invocationBuilder.get(String.class);
+        String response = invocationBuilder.get(String.class);
+        List<CheckoutInformation> checkouts = new ArrayList<>();
+        try {
+            Object o = JSONValue.parse(response);
+            if(o instanceof JSONObject) {
+                JSONObject jsonResp = (JSONObject) o;
+                jsonResp = (JSONObject)jsonResp.get("response");
+                List<URL> l = new ArrayList();
+                Object loanO = jsonResp.get("loan");
+                if(loanO instanceof JSONObject){
+                    JSONObject loanJO = (JSONObject) loanO;
+                    checkouts.add(new CheckoutInformation(
+                            loanJO.get("recordId").toString(),
+                            loanJO.get("loanId").toString(),
+                            new DateTime(loanJO.get("startDate")),
+                            new DateTime(loanJO.get("endDate"))
+                            ));
+                }
+
+                //return new LoanResponse(recordId, l);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return checkouts;
+    }
+
+    public void returnCheckout(CheckoutInformation checkoutInformation) {
+        WebTarget target = client.target(url + "/rest/v1/LoanService/Return_Loan")
+                .queryParam("loanId", checkoutInformation.getLoanId());
+
+        Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_JSON_TYPE);
+
+        //ResponseType response = invocationBuilder.get(String.class);
+        String response = invocationBuilder.get(String.class);
+
+        int i = 0;
+        i++;
+    }
+
+    public List<CheckoutInformation> getCheckoutHistory() {
+        WebTarget target = client.target(url + "/rest/v1/LoanService/Get_Historical_Loans");
+
+        Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_JSON_TYPE);
+
+        //ResponseType response = invocationBuilder.get(String.class);
+        String response = invocationBuilder.get(String.class);
+        List<CheckoutInformation> checkouts = new ArrayList<>();
+        //TODO
+
+        return checkouts;
+    }
+
     public GetLoanablesResponse getCheckoutOptionsForRecord(String recordId)
     {
         List<GetLoanablesResponse> l = getCheckoutOptionsForRecords(Arrays.asList(recordId));
@@ -310,7 +520,9 @@ public class OdiloAPI
 
                     GetLoanablesResponse glResponse = new GetLoanablesResponse(
                             retJO.get("recordId").toString(),
-                            types);
+                            types,
+                            this.getAvailable(retJO.get("recordId").toString())
+                    );
                     ret.add(glResponse);
                 }
 
@@ -320,6 +532,28 @@ public class OdiloAPI
         }
 
         return ret;
+    }
+
+    private int getAvailable(String recordId) {
+        WebTarget target = client.target(url + "/rest/v1/LoanService/Get_Available")
+                .queryParam("recordId", recordId);
+
+        Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_JSON_TYPE);
+
+        String response = invocationBuilder.get(String.class);
+        List<CheckoutInformation> checkouts = new ArrayList<>();
+        try {
+            Object o = JSONValue.parse(response);
+            if(o instanceof JSONObject) {
+                JSONObject jsonResp = (JSONObject) o;
+                jsonResp = (JSONObject)jsonResp.get("response");
+                return Integer.parseInt(jsonResp.get("$").toString());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return 0;
     }
 
     private Invocation.Builder getBuilder(WebTarget target) {

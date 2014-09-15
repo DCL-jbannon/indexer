@@ -31,6 +31,8 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
     private File econtentCsvTempFile = null;
     private ICsvBeanWriter econtentCsvWriter = null;
 
+    private boolean shouldMovePrintCSV = false;
+    private boolean shouldMoveEContentCSV = false;
 	
 	/**
 	 * Build a csv file to import into strands
@@ -42,22 +44,12 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 		logger.info("Creating Catalog File for Strands");
 
 		try {
-            if(config.getBool(BasicConfigOptions.DO_FULL_REINDEX)) {
-                //printCsvWriter and econtentCsvWriter are the same because we're just producing one giant file that
-                //will overwrite everything
-                printCsvTempFile = File.createTempFile("strandsFull", ".csv");
-                printCsvWriter = new CsvBeanWriter(new FileWriter(printCsvTempFile), CsvPreference.STANDARD_PREFERENCE);
-                econtentCsvTempFile = printCsvTempFile;
-                econtentCsvWriter = printCsvWriter;
-                writeHeader(this.printCsvWriter);
-            } else {
-                printCsvTempFile = File.createTempFile("strandsPrint", ".csv");
-                printCsvWriter = new CsvBeanWriter(new FileWriter(printCsvTempFile), CsvPreference.STANDARD_PREFERENCE);
-                econtentCsvTempFile = File.createTempFile("strandsEcontent", ".csv");
-                econtentCsvWriter = new CsvBeanWriter(new FileWriter(econtentCsvTempFile), CsvPreference.STANDARD_PREFERENCE);
-                writeHeader(this.printCsvWriter);
-                writeHeader(this.econtentCsvWriter);
-            }
+            printCsvTempFile = File.createTempFile("strandsPrint", ".csv");
+            printCsvWriter = new CsvBeanWriter(new FileWriter(printCsvTempFile), CsvPreference.STANDARD_PREFERENCE);
+            econtentCsvTempFile = File.createTempFile("strandsEcontent", ".csv");
+            econtentCsvWriter = new CsvBeanWriter(new FileWriter(econtentCsvTempFile), CsvPreference.STANDARD_PREFERENCE);
+            writeHeader(this.printCsvWriter);
+            writeHeader(this.econtentCsvWriter);
 
 		} catch (Exception e) {
 			logger.error("Error generating Strands catalog " + e.toString());
@@ -119,6 +111,7 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 	@Override
 	public boolean processEContentRecord(ResultSet eContentRecord) {
 		try {
+            this.shouldMoveEContentCSV = true;
 			// Write the id
             ContentBean content = new ContentBean();
 
@@ -165,9 +158,10 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 
 	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
 		try {
+            this.shouldMovePrintCSV = true;
             logger.debug("Processing record: "+recordInfo.getId());
 
-            if(recordInfo.getRecordStatus() == MarcProcessor.RecordStatus.RECORD_DELETED) {
+            if(recordInfo.getRecordStatus() == MarcProcessor.RecordStatus.RECORD_DELETED || recordInfo.isEContent()) {
                 return true;
             }
 
@@ -247,17 +241,18 @@ public class StrandsProcessor implements IMarcRecordProcessor, IEContentProcesso
 
         // Copy the temp file to the correct location so it can be picked up by
         // strands
-        if(config.getBool(BasicConfigOptions.DO_FULL_REINDEX)) {
-            String loc = config.getString(StrandsConfigOptions.FULL_RECATALOG_CSV_LOC);
-            copyToOutput(new File(loc), this.printCsvTempFile);
+        String loc = null;
 
-        } else {
-            String loc = config.getString(StrandsConfigOptions.PARTIAL_RECATALOG_PRINT_CSV_LOC);
+        if(shouldMovePrintCSV) {
+            loc = config.getString(StrandsConfigOptions.PARTIAL_RECATALOG_PRINT_CSV_LOC);
             copyToOutput(new File(loc), this.printCsvTempFile);
+        }
 
+        if(shouldMoveEContentCSV) {
             loc = config.getString(StrandsConfigOptions.PARTIAL_RECATALOG_ECONTENT_CSV_LOC);
             copyToOutput(new File(loc), this.econtentCsvTempFile);
         }
+
     }
 
     private static String prepForCsv(String value)

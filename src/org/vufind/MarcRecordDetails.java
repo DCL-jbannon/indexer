@@ -245,7 +245,7 @@ public class MarcRecordDetails {
 				} else if (url.matches("(?i).*?(idm.oclc.org/login|ezproxy).*?")) {
 					isSourceUrl = true;
 				} else {
-					logger.info("Unknown URL " + url + " " + text);
+					logger.debug("Unknown URL " + url + " " + text);
 				}
 				if (isSourceUrl){
 					System.out.println("Found source url");
@@ -2901,10 +2901,10 @@ public class MarcRecordDetails {
                     for (DetectionSettings curSettings : marcProcessor.getDetectionSettings()) {
                         Set<String> fieldData = getFieldList(curSettings.getFieldSpec());
                         boolean isMatch = false;
-                        logger.debug("Found " + fieldData.size() + " fields matching " + curSettings.getFieldSpec());
+//                        logger.debug("Found " + fieldData.size() + " fields matching " + curSettings.getFieldSpec());
                         for (String curField : fieldData) {
-                            logger.debug("Testing if value -" + curField.toLowerCase() +
-                                    "- matches -" + curSettings.getValueToMatch().toLowerCase() + "-");
+//                            logger.debug("Testing if value -" + curField.toLowerCase() +
+//                                    "- matches -" + curSettings.getValueToMatch().toLowerCase() + "-");
 
                             String textToMatch = ".*" + curSettings.getValueToMatch().toLowerCase() + ".*";
                             textToMatch = textToMatch.replaceAll(Pattern.quote("+"), "\\\\+");

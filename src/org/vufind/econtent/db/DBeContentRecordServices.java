@@ -71,8 +71,8 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
 	{
         if(insertRecordStatement==null) {
             insertRecordStatement = this.conn.prepareStatement(
-                "INSERT INTO " + DBeContentRecordServices.tableName + "(`title`,`subTitle`,`accessType`, `author`, `source`, `sourceUrl`, `date_added`, `publisher`, `isbn`, `genre`) " +
-                "VALUES (?, ?, 'free', ?, 'OverDriveAPI', ?, ?, ?, ?, ?)");
+                "INSERT INTO " + DBeContentRecordServices.tableName + "(`title`,`subTitle`,`accessType`, `author`, `source`, `sourceUrl`, `date_added`, `publisher`, `isbn`, `genre`, `external_id`) " +
+                "VALUES (?, ?, 'free', ?, 'OverDriveAPI', ?, ?, ?, ?, ?, ?)");
         }
 
 		long unixTime = System.currentTimeMillis() / 1000L;
@@ -96,6 +96,7 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
            insertRecordStatement.setString(6, "" + publisher);
            insertRecordStatement.setString(7, "" + isbn);
            insertRecordStatement.setString(8, "" + mediaType);
+           insertRecordStatement.setString(9, "" + overDriveId);
            insertRecordStatement.execute();
 	   }
 	   catch(Exception e)
@@ -120,6 +121,7 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
                 "	  , `publisher` = ? "+
                 "	  , `genre` = ? "+
                 "	  , `isbn` = ? "+
+                "	  , `external_id` = ? "+
                 "	  WHERE `id` = ?");
         }
 
@@ -143,7 +145,8 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
             updateRecordStatement.setString(6, "" + publisher);
             updateRecordStatement.setString(7, "" + mediaType);
             updateRecordStatement.setString(8, "" + isbn);
-            updateRecordStatement.setString(9, "" + recordId);
+            updateRecordStatement.setString(9, "" + overDriveId);
+            updateRecordStatement.setString(10, "" + recordId);
             updateRecordStatement.execute();
 		}
 		catch(Exception e)

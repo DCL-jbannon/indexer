@@ -45,7 +45,7 @@ public class ConnectionProvider {
         // Setup connections to vufind and econtent databases
 
         int maxWait = 10*1000;
-        int maxThreads = 10;
+        int maxThreads = 50;
 
         BasicDataSource vufindDataSource = new BasicDataSource();
         vufindDataSource.setDriverClassName(config.getString(BasicConfigOptions.VUFINDDB_DRIVER));

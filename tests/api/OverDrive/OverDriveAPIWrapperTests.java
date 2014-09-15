@@ -103,7 +103,7 @@ public class OverDriveAPIWrapperTests {
 	}
 	
 	/**
-	 * method getItemMetadata
+	 * method getRecord
 	 * when called
 	 * should returnItem
 	 */

@@ -9,10 +9,12 @@ import java.util.List;
 public class GetLoanablesResponse {
     protected String recordId;
     protected List<String> types;
+    protected Integer available;
 
-    public GetLoanablesResponse(String recordId, List<String> types) {
+    public GetLoanablesResponse(String recordId, List<String> types, int available) {
         this.recordId = recordId;
         this.types = types;
+        this.available = available;
     }
 
     public String getRecordId() {
@@ -21,5 +23,9 @@ public class GetLoanablesResponse {
 
     public List<String> getTypes() {
         return types;
+    }
+
+    public Integer getAvailable() {
+        return available;
     }
 }

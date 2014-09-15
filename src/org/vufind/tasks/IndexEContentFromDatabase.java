@@ -91,6 +91,10 @@ public class IndexEContentFromDatabase {
             } catch (SolrServerException |IOException e) {
                 logger.error("Could not commit to Solr", e);
             }
+
+            for (IEContentProcessor processor : econtentProcessors) {
+                processor.finish();
+            }
             int ii = 0;
             ii++;
         } catch (SQLException ex) {

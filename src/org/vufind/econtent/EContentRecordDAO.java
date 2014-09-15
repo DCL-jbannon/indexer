@@ -123,11 +123,28 @@ public class EContentRecordDAO {
 		return record;
 	}
 
-    private HashMap<String, EContentRecord> allRecords = null;
+    public EContentRecord findByExternalId(String id) throws SQLException {
+        EContentRecord record = null;
+        String sql =
+                "SELECT * " +
+                "FROM econtent_record " +
+                "WHERE external_id=?";
+        this.getRecordPS = getActivePreparedStatement(this.getRecordPS, sql);
+
+        this.getRecordPS.setString(1, id);
+        ResultSet rs = this.getRecordPS.executeQuery();
+        if (rs.first()) {
+            record = new EContentRecord(this, rs, config);
+        }
+        rs.close();
+        return record;
+    }
+
+    private HashMap<String, EContentRecord> allRecords = new HashMap<>();
 
     private PreparedStatement getAllFreegalRecordPS = null;
     private HashMap<String, EContentRecord> selectAllFreegalRecordsInDB() throws SQLException {
-        if(allRecords==null) {
+        if(allRecords==null || allRecords.size() < 1) {
             allRecords = new HashMap<String, EContentRecord>();
             this.getAllFreegalRecordPS = getActivePreparedStatement(this.getAllFreegalRecordPS,
                     "SELECT * FROM econtent_record WHERE lower(source)='freegal'");
@@ -198,13 +215,18 @@ public class EContentRecordDAO {
 		for (String column : columns) {
 			setEContentRecordParameter(this.insertRecordPS, index++, column, record);
 		}
-        this.insertRecordPS.executeUpdate();
-		ResultSet generatedKeys = this.insertRecordPS.getGeneratedKeys();
-		long id = -1;
-		if (generatedKeys.next()) {
-			id = generatedKeys.getLong(1);
-		}
-		record.set("id", id);
+        long id = -1;
+        try {
+            this.insertRecordPS.executeUpdate();
+            ResultSet generatedKeys = this.insertRecordPS.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                id = generatedKeys.getLong(1);
+            }
+            record.set("id", id);
+        } catch(SQLException e) {
+            logger.error("Error inserting econtent_record", e);
+        }
+
         allRecords.put(getAllRecordsKey(record.getString("title"), record.getString("author")), record);
 		return id;
 	}
@@ -384,24 +406,25 @@ public class EContentRecordDAO {
 
 	private void setEContentRecordParameter(PreparedStatement stmt, int index,
 			String column, EContentRecord record) throws SQLException {
-        if( column.equals("addedBy")) {
-            int ii = 0;
-            ii++;
+        try {
+            if (column.equals("id") || column.equals("availableCopies")
+                    || column.equals("onOrderCopies") || column.equals("addedBy")
+                    || column.equals("date_added") || column.equals("date_updated")
+                    || column.equals("reviewedBy") || column.equals("reviewDate")
+                    || column.equals("trialTitle")) {
+                if (record.get(column) == null) {
+                    // pay special attention to NULL values in integer columns
+                    stmt.setNull(index, java.sql.Types.BIGINT);
+                } else {
+                    stmt.setLong(index, record.getLong(column));
+                }
+            } else {
+                stmt.setString(index, record.getString(column));
+            }
+        } catch (Exception e) {
+            logger.error("Error setting econtentRecordParameter", e);
         }
-		if (column.equals("id") || column.equals("availableCopies")
-				|| column.equals("onOrderCopies") || column.equals("addedBy")
-				|| column.equals("date_added") || column.equals("date_updated")
-				|| column.equals("reviewedBy") || column.equals("reviewDate")
-				|| column.equals("trialTitle")) {
-			if (record.get(column) == null) {
-				// pay special attention to NULL values in integer columns
-				stmt.setNull(index, java.sql.Types.BIGINT);
-			} else {
-				stmt.setLong(index, record.getInteger(column));
-			}
-		} else {
-			stmt.setString(index, record.getString(column));
-		}
+
 	}
 
 	private void setEContentItemParameter(PreparedStatement stmt, int index,

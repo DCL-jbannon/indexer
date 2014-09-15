@@ -7,7 +7,6 @@
     <JAVADOC />
     <SOURCES>
       <root url="file://$PROJECT_DIR$/lib/commons-codec-1.7" />
-      <root url="file://$PROJECT_DIR$/run/processMarc" />
     </SOURCES>
     <jarDirectory url="file://$PROJECT_DIR$/lib" recursive="false" />
     <jarDirectory url="file://$PROJECT_DIR$/lib/commons-codec-1.7" recursive="false" />

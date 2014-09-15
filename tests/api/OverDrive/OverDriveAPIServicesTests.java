@@ -56,7 +56,7 @@ public class OverDriveAPIServicesTests {
 	}
 	
 	/**
-	 * method getItemMetadata
+	 * method getRecord
 	 * when called
 	 * should executesCorrectly
 	 */
