@@ -2906,10 +2906,7 @@ public class MarcRecordDetails {
 //                            logger.debug("Testing if value -" + curField.toLowerCase() +
 //                                    "- matches -" + curSettings.getValueToMatch().toLowerCase() + "-");
 
-                            String textToMatch = ".*" + curSettings.getValueToMatch().toLowerCase() + ".*";
-                            textToMatch = textToMatch.replaceAll(Pattern.quote("+"), "\\\\+");
-
-                            isMatch = ((String) curField.toLowerCase()).matches(textToMatch);
+                            isMatch = curField.toLowerCase().contains(curSettings.getValueToMatch());
                             if (isMatch) break;
                         }
                         if (isMatch) {

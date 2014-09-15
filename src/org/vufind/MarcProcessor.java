@@ -178,7 +178,12 @@ public class MarcProcessor {
 			while (eContentDetectionSettingsRS.next()) {
 				DetectionSettings settings = new DetectionSettings();
 				settings.setFieldSpec(eContentDetectionSettingsRS.getString("fieldSpec"));
-				settings.setValueToMatch(eContentDetectionSettingsRS.getString("valueToMatch"));
+                String matchValue = eContentDetectionSettingsRS.getString("valueToMatch");
+                matchValue = matchValue.trim().toLowerCase();
+                if(matchValue.endsWith(".")) {
+                    matchValue = matchValue.substring(0, matchValue.length()-1);
+                }
+				settings.setValueToMatch(matchValue);
 				settings.setSource(eContentDetectionSettingsRS.getString("source"));
 				settings.setAccessType(eContentDetectionSettingsRS.getString("accessType"));
 				settings.setItem_type(eContentDetectionSettingsRS.getString("item_type"));
