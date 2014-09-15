@@ -2,17 +2,17 @@ package org.vufind.processors;
 
 import java.io.File;
 import java.io.FileReader;
+import java.net.URI;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
 import org.dcl.utils.ActiveEcontentUtils;
 import org.ini4j.Ini;
 import org.slf4j.Logger;
@@ -41,11 +41,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 
     private DynamicConfig config = null;
 
-	private String econtentDBConnectionInfo;
-	private String overdriveUrl;
 	private ArrayList<GutenbergItemInfo> gutenbergItemInfo = null;
-	
-	private String vufindUrl;
 	
 	private PreparedStatement doesIlsIdExist;
 	private PreparedStatement createEContentRecord;
@@ -72,6 +68,43 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
         ConfigFiller.fill(config, OverDriveConfigOptions.values(), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
         ConfigFiller.fill(config, ExtractEContentConfigOptions.values(), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
 
+        //Get a list of information about Gutenberg items
+        String gutenbergItemFile = config.getString(ExtractEContentConfigOptions.GUTENBERG_ITEM_FILE);
+        if (gutenbergItemFile == null || gutenbergItemFile.length() == 0){
+            logger.warn("Unable to get Gutenberg Item File in Process settings.  Please add a gutenbergItemFile key.");
+        }else{
+            HashSet<String> validFormats = new HashSet<String>();
+            validFormats.add("epub");
+            validFormats.add("pdf");
+            validFormats.add("jpg");
+            validFormats.add("gif");
+            validFormats.add("mp3");
+            validFormats.add("plucker");
+            validFormats.add("kindle");
+            validFormats.add("externalLink");
+            validFormats.add("externalMP3");
+            validFormats.add("interactiveBook");
+            validFormats.add("overdrive");
+
+            //Load the items
+            gutenbergItemInfo = new ArrayList<GutenbergItemInfo>();
+            try {
+                CSVReader gutenbergReader = new CSVReader(new FileReader(gutenbergItemFile));
+                //Read headers
+                gutenbergReader.readNext();
+                String[] curItemInfo = gutenbergReader.readNext();
+                while (curItemInfo != null){
+                    GutenbergItemInfo itemInfo = new GutenbergItemInfo(curItemInfo[1], curItemInfo[2], curItemInfo[3], curItemInfo[4], curItemInfo[5]);
+
+                    gutenbergItemInfo.add(itemInfo);
+                    curItemInfo = gutenbergReader.readNext();
+                }
+            } catch (Exception e) {
+                logger.error("Could not read Gutenberg Item file");
+            }
+
+        }
+
 		return resetPreparedStatements();
 	}
 
@@ -81,8 +114,20 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
         try {
             //Connect to the vufind database
             doesIlsIdExist = econtentConn.prepareStatement("SELECT id from econtent_record WHERE ilsId = ?");
-            createEContentRecord = econtentConn.prepareStatement("INSERT INTO econtent_record (ilsId, cover, source, title, subTitle, author, author2, description, contents, subject, language, publisher, edition, isbn, issn, upc, lccn, topic, genre, region, era, target_audience, sourceUrl, purchaseUrl, publishDate, marcControlField, accessType, date_added, marcRecord) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", PreparedStatement.RETURN_GENERATED_KEYS);
-            updateEContentRecord = econtentConn.prepareStatement("UPDATE econtent_record SET ilsId = ?, source = ?, title = ?, subTitle = ?, author = ?, author2 = ?, description = ?, contents = ?, subject = ?, language = ?, publisher = ?, edition = ?, isbn = ?, issn = ?, upc = ?, lccn = ?, topic = ?, genre = ?, region = ?, era = ?, target_audience = ?, sourceUrl = ?, purchaseUrl = ?, publishDate = ?, marcControlField = ?, accessType = ?, date_updated = ?, marcRecord = ? WHERE id = ?");
+            createEContentRecord = econtentConn.prepareStatement(
+                "INSERT INTO econtent_record " +
+                "(ilsId, cover, source, title, subTitle, author, author2, description, contents, subject, language, " +
+                    "publisher, edition, isbn, issn, upc, lccn, topic, genre, region, era, target_audience, sourceUrl, " +
+                    "purchaseUrl, publishDate, marcControlField, accessType, date_added, marcRecord, external_id) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", PreparedStatement.RETURN_GENERATED_KEYS);
+            updateEContentRecord = econtentConn.prepareStatement(
+                "UPDATE econtent_record " +
+                "SET ilsId = ?, source = ?, title = ?, subTitle = ?, author = ?, author2 = ?, description = ?, " +
+                    "contents = ?, subject = ?, language = ?, publisher = ?, edition = ?, isbn = ?, issn = ?, upc = ?, " +
+                    "lccn = ?, topic = ?, genre = ?, region = ?, era = ?, target_audience = ?, sourceUrl = ?, " +
+                    "purchaseUrl = ?, publishDate = ?, marcControlField = ?, accessType = ?, date_updated = ?, " +
+                    "marcRecord = ?, external_id = ? " +
+                    "WHERE id = ?");
             deleteEContentRecord = econtentConn.prepareStatement("DELETE FROM econtent_record WHERE ilsId = ?");
             deleteEContentItem = econtentConn.prepareStatement("DELETE FROM econtent_item where id = ?");
             deleteEContentItemForRecord = econtentConn.prepareStatement("DELETE ei.* FROM dclecontent_prod.econtent_item ei, dclecontent_prod.econtent_record er WHERE er.ilsId = ? AND er.id = ei.recordId");
@@ -225,8 +270,19 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 					createEContentRecord.setString(21, Util.getCRSeparatedString(recordInfo.getMappedField("era")));
 					createEContentRecord.setString(22, Util.getCRSeparatedString(recordInfo.getMappedField("target_audience")));
 					String sourceUrl = "";
+                    String externalId = "";
 					if (recordInfo.getSourceUrls().size() == 1){
 						sourceUrl = recordInfo.getSourceUrls().get(0).getUrl();
+                        if(source.equalsIgnoreCase("overdrive")) {
+                            List<NameValuePair> parameters = URLEncodedUtils.parse(
+                                    new URI(sourceUrl),
+                                    java.nio.charset.Charset.defaultCharset().toString());
+                            for(NameValuePair pair : parameters) {
+                                if(pair.getName().equalsIgnoreCase("ID")) {
+                                    externalId = pair.getValue();
+                                }
+                            }
+                        }
 					}
 					createEContentRecord.setString(23, sourceUrl);
 					createEContentRecord.setString(24, recordInfo.getPurchaseUrl());
@@ -235,6 +291,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 					createEContentRecord.setString(27, accessType);
 					createEContentRecord.setLong(28, new Date().getTime() / 1000);
 					createEContentRecord.setString(29, recordInfo.toString());
+                    createEContentRecord.setString(30, externalId);
 					int rowsInserted = createEContentRecord.executeUpdate();
 					if (rowsInserted != 1){
 						logger.error("Could not insert row into the database");
@@ -269,10 +326,21 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 					updateEContentRecord.setString(19, Util.getCRSeparatedString(recordInfo.getMappedField("geographic")));
 					updateEContentRecord.setString(20, Util.getCRSeparatedString(recordInfo.getMappedField("era")));
 					updateEContentRecord.setString(21, Util.getCRSeparatedString(recordInfo.getMappedField("target_audience")));
-					String sourceUrl = "";
-					if (recordInfo.getSourceUrls().size() == 1){
-						sourceUrl = recordInfo.getSourceUrls().get(0).getUrl();
-					}
+                    String sourceUrl = "";
+                    String externalId = "";
+                    if (recordInfo.getSourceUrls().size() == 1){
+                        sourceUrl = recordInfo.getSourceUrls().get(0).getUrl();
+                        if(source.equalsIgnoreCase("overdrive")) {
+                            List<NameValuePair> parameters = URLEncodedUtils.parse(
+                                    new URI(sourceUrl),
+                                    java.nio.charset.Charset.defaultCharset().toString());
+                            for(NameValuePair pair : parameters) {
+                                if(pair.getName().equalsIgnoreCase("ID")) {
+                                    externalId = pair.getValue();
+                                }
+                            }
+                        }
+                    }
 					updateEContentRecord.setString(22, sourceUrl);
 					updateEContentRecord.setString(23, recordInfo.getPurchaseUrl());
 					updateEContentRecord.setString(24, recordInfo.getFirstFieldValueInSet("publishDate"));
@@ -280,7 +348,8 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 					updateEContentRecord.setString(26, accessType);
 					updateEContentRecord.setLong(27, new Date().getTime() / 1000);
 					updateEContentRecord.setString(28, recordInfo.toString());
-					updateEContentRecord.setLong(29, eContentRecordId);
+                    updateEContentRecord.setString(29, externalId);
+					updateEContentRecord.setLong(30, eContentRecordId);
 					int rowsInserted = updateEContentRecord.executeUpdate();
 					if (rowsInserted != 1){
 						logger.error("Could not insert row into the database");
@@ -507,76 +576,8 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 		}
 	}
 
-	protected boolean loadConfig(Ini configIni, Logger logger) {
-		     //TODO clean this up
-		econtentDBConnectionInfo = Util.cleanIniValue(configIni.get("Database", "database_econtent_jdbc"));
-		if (econtentDBConnectionInfo == null || econtentDBConnectionInfo.length() == 0) {
-			logger.error("Database connection information for eContent database not found in General Settings.  Please specify connection information in a econtentDatabase key.");
-			return false;
-		}
-		
-		vufindUrl = configIni.get("Site", "url");
-		if (vufindUrl == null || vufindUrl.length() == 0) {
-			logger.error("Unable to get URL for VuFind in General settings.  Please add a vufindUrl key.");
-			return false;
-		}
-		
-		//Load link to overdrive if any
-		overdriveUrl = configIni.get("OverDrive", "marcIndicator");
-		if (overdriveUrl == null || overdriveUrl.length() == 0) {
-			logger.warn("Unable to get OverDrive Url in Process settings.  Please add a overdriveUrl key.");
-		}
-		
-		//Get a list of information about Gutenberg items
-		String gutenbergItemFile = configIni.get("Reindex", "gutenbergItemFile");
-		if (gutenbergItemFile == null || gutenbergItemFile.length() == 0){
-			logger.warn("Unable to get Gutenberg Item File in Process settings.  Please add a gutenbergItemFile key.");
-		}else{
-			HashSet<String> validFormats = new HashSet<String>();
-			validFormats.add("epub");
-			validFormats.add("pdf");
-			validFormats.add("jpg");
-			validFormats.add("gif");
-			validFormats.add("mp3");
-			validFormats.add("plucker");
-			validFormats.add("kindle");
-			validFormats.add("externalLink");
-			validFormats.add("externalMP3");
-			validFormats.add("interactiveBook");
-			validFormats.add("overdrive");
-			
-			//Load the items 
-			gutenbergItemInfo = new ArrayList<GutenbergItemInfo>();
-			try {
-				CSVReader gutenbergReader = new CSVReader(new FileReader(gutenbergItemFile));
-				//Read headers
-				gutenbergReader.readNext();
-				String[] curItemInfo = gutenbergReader.readNext();
-				while (curItemInfo != null){
-					GutenbergItemInfo itemInfo = new GutenbergItemInfo(curItemInfo[1], curItemInfo[2], curItemInfo[3], curItemInfo[4], curItemInfo[5]);
-					
-					gutenbergItemInfo.add(itemInfo);
-					curItemInfo = gutenbergReader.readNext();
-				}
-			} catch (Exception e) {
-				logger.error("Could not read Gutenberg Item file");
-			}
-			
-		}
-		
-		return true;
-		
-	}
-
     @Override
 	public void finish() {
 
 	}
-	
-
-
-	public String getVufindUrl() {
-		return vufindUrl;
-	}
-
 }
