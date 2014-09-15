@@ -61,7 +61,19 @@ public class FreegalAPI {
 				+ freegalLibrary + "/" + freegalUser;
 		logger.debug("Genre url: " + genreUrl);
 		DocumentBuilder db = documentBuilderFactory.newDocumentBuilder();
-		Document genreDoc = db.parse(genreUrl);
+        Document genreDoc = null;
+        try{
+            genreDoc = db.parse(genreUrl);
+        } catch (SAXException | IOException e) {
+            logger.error("Error while reading Freegal URL", e);
+            try {Thread.sleep(4000);} catch (InterruptedException e1) {e1.printStackTrace();}
+            try {
+                genreDoc = db.parse(genreUrl);
+            } catch (SAXException | IOException ee) {
+                logger.error("Failed twice to read Freegal URL", ee);
+            }
+        }
+
 		NodeList genres = genreDoc.getElementsByTagName("Genre");
 		for (int i = 0; i < genres.getLength(); i++) {
 			Node genreNode = genres.item(i);
