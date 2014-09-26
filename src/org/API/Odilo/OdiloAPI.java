@@ -76,15 +76,31 @@ public class OdiloAPI
 
 	public Set<String> getAllIds()
 	{
-        return getUpdatesSince(new DateTime().minusYears(20));
+        return search("*");
 	}
 
-    private DateTimeFormatter getUpdateDateFormatter = DateTimeFormat.forPattern("dd/MM/Y");
-    public Set<String> getUpdatesSince(DateTime since)
+    public static enum BoundedSearchType {
+        CREATED,
+        UPDATED,
+        DELETED
+    }
+
+    public Set<String> getUpdatesSince(DateTime since, List<BoundedSearchType> searchTypes) {
+        return getUpdatesSince(since, searchTypes, 0);
+    }
+
+    private DateTimeFormatter getUpdateDateFormatter = DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm'Z'");
+    public Set<String> getUpdatesSince(DateTime since, List<BoundedSearchType> searchTypes, int offset)
     {
+        String status = null;
+        for(BoundedSearchType type :searchTypes) {
+            status = (status == null) ? type.name() : status + "|" + type.name();
+        }
         WebTarget target = client.target(url + "/rest/v1/SearchService/BoundedSearch")
                 .queryParam("ini", getUpdateDateFormatter.print(since))
                 .queryParam("end", getUpdateDateFormatter.print(new DateTime()))
+                .queryParam("status", status)
+                .queryParam("offset", offset)
                 .queryParam("limit", 1000);
         Invocation.Builder invocationBuilder = getBuilder(target);
         Response response = invocationBuilder.get();
@@ -101,8 +117,41 @@ public class OdiloAPI
             }
         }
         if(ret.size()>=1000) {
-            DateTime latestDt = null;
-            ret.addAll(getUpdatesSince(latestDt));
+            ret.addAll(getUpdatesSince(since, searchTypes, offset+ret.size()));
+        }
+        return ret;
+    }
+
+    public Set<String> search(String query) {
+        return search(query, 0);
+    }
+
+    /**
+     * For tests
+     * @return
+     */
+    public Set<String> search(String query, int offset)
+    {
+        WebTarget target = client.target(url + "/rest/v1/SearchService/Search")
+                .queryParam("Query", query)
+                .queryParam("offset", offset)
+                .queryParam("limit", 1000);
+        Invocation.Builder invocationBuilder = getBuilder(target);
+        Response response = invocationBuilder.get();
+        Object jResponse = JSONValue.parse(response.readEntity(String.class));
+        Set<String> ret = new HashSet<>();
+        if(jResponse instanceof JSONObject) {
+            JSONObject jObject = (JSONObject) jResponse;
+            Object v = jObject.get("recordId");
+            if(v instanceof JSONArray) {
+                JSONArray recordArr = (JSONArray)v;
+                for(Object o: recordArr) {
+                    ret.add(o.toString());
+                }
+            }
+        }
+        if(ret.size()>=1000) {
+            ret.addAll(search(query, offset + ret.size()));
         }
         return ret;
     }
@@ -113,6 +162,8 @@ public class OdiloAPI
             .queryParam("recordId", odiloId);
         Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_XML_TYPE);
         Response response = invocationBuilder.get();
+
+        //Object jResponse = response.readEntity(String.class);
 
         Record record = getRecordFromString(response.readEntity(String.class));
         record.setExternalId(odiloId);
@@ -255,8 +306,8 @@ public class OdiloAPI
         return null;
     }
 
-    public ReserveResponse holdItem(String recordId, String loanableId) {
-        WebTarget target = client.target(url+ "/rest/v1/LoanService/New_Reserve")
+    public HoldResponse holdItem(String recordId, String loanableId) {
+        WebTarget target = client.target(url+ "/rest/v1/LoanService/New_Hold")
                 .queryParam("recordId", recordId);
                 //.queryParam("loanableId", loanableId);
 
@@ -269,9 +320,9 @@ public class OdiloAPI
             if(o instanceof JSONObject) {
                 JSONObject jsonResp = (JSONObject) o;
                 jsonResp = (JSONObject)jsonResp.get("response");
-                return new ReserveResponse(
+                return new HoldResponse(
                         jsonResp.get("recordId").toString(),
-                        jsonResp.get("reserveId").toString(),
+                        jsonResp.get("holdId").toString(),
                         jsonResp.get("status").toString());
             }
         } catch (Exception e) {
@@ -281,8 +332,8 @@ public class OdiloAPI
         return null;
     }
 
-    public List<ReserveResponse> getHolds() {
-        WebTarget target = client.target(url + "/rest/v1/LoanService/Get_Reserves");
+    public List<HoldResponse> getHolds() {
+        WebTarget target = client.target(url + "/rest/v1/LoanService/Get_Holds");
         //.queryParam("loanableId", loanableId);
 
         Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_JSON_TYPE);
@@ -294,16 +345,16 @@ public class OdiloAPI
             if(o instanceof JSONObject) {
                 JSONObject jsonResp = (JSONObject) o;
                 jsonResp = (JSONObject)jsonResp.get("response");
-                List<ReserveResponse> l = new ArrayList();
-                Object reservesO = jsonResp.get("reserves");
+                List<HoldResponse> l = new ArrayList();
+                Object reservesO = jsonResp.get("holds");
                 if(reservesO instanceof JSONArray){
                     JSONArray jsonArray = (JSONArray) reservesO;
                     for(Object oo : jsonArray) {
                         if(oo instanceof JSONObject) {
                             JSONObject reserveJO = (JSONObject) oo;
-                            l.add( new ReserveResponse(
+                            l.add( new HoldResponse(
                                     reserveJO.get("recordId").toString(),
-                                    reserveJO.get("reserveId").toString(),
+                                    reserveJO.get("holdId").toString(),
                                     reserveJO.get("status").toString()) );
                         }
                     }
@@ -318,9 +369,9 @@ public class OdiloAPI
         return null;
     }
 
-    public void releaseHold(ReserveResponse reserve) {
-        WebTarget target = client.target(url + "/rest/v1/LoanService/Remove_Reserve")
-            .queryParam("reserveId", reserve.getReserveId());
+    public void releaseHold(HoldResponse reserve) {
+        WebTarget target = client.target(url + "/rest/v1/LoanService/Remove_Hold")
+            .queryParam("holdId", reserve.getHoldId());
 
         Invocation.Builder invocationBuilder = getBuilder(target, MediaType.APPLICATION_JSON_TYPE);
 
@@ -521,7 +572,7 @@ public class OdiloAPI
                     GetLoanablesResponse glResponse = new GetLoanablesResponse(
                             retJO.get("recordId").toString(),
                             types,
-                            this.getAvailable(retJO.get("recordId").toString())
+                            Integer.parseInt(retJO.get("available").toString())
                     );
                     ret.add(glResponse);
                 }

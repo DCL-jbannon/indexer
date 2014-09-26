@@ -6,12 +6,12 @@ import javax.xml.bind.annotation.XmlElement;
 /**
  * Created by jbannon on 8/25/2014.
  */
-public class ReserveResponse {
+public class HoldResponse {
     protected String recordId;
     protected String reserveId;
     protected String status;
 
-    public ReserveResponse(String recordId, String reserveId, String status) {
+    public HoldResponse(String recordId, String reserveId, String status) {
         this.recordId = recordId;
         this.reserveId = reserveId;
         this.status = status;
@@ -21,7 +21,7 @@ public class ReserveResponse {
         return recordId;
     }
 
-    public String getReserveId() {
+    public String getHoldId() {
         return reserveId;
     }
 

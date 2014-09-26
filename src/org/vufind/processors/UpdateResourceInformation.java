@@ -470,7 +470,7 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 
     @Override
 	public void finish() {
-		if (config.getBool(MarcConfigOptions.REMOVE_RECORDS_NOT_IN_MARC_EXPORT)){
+		if (config.getBool(MarcConfigOptions.REMOVE_RECORDS_NOT_IN_MARC_EXPORT)){          //....
 			
 			//Mark any resources that no longer exist as deleted.
 			int numResourcesToDelete = 0;

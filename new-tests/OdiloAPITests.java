@@ -1,14 +1,10 @@
 import org.API.Odilo.OdiloAPI;
 import org.API.Odilo.manualModels.*;
+import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Test;
-import org.marc4j.MarcXmlHandler;
-import org.marc4j.MarcXmlParser;
-import org.marc4j.RecordStack;
-import org.xml.sax.InputSource;
 
 import java.io.InputStream;
-import java.io.StringReader;
 import java.util.*;
 
 /**
@@ -30,7 +26,7 @@ public class OdiloAPITests {
 
     @Test
     public void test_getLoanables() throws Exception {
-        Set<String> ids = this.api.getAllIds();
+        Set<String> ids = this.api.search("*");
         assert(ids.size()>0);
 
         Random rand = new Random();
@@ -45,9 +41,23 @@ public class OdiloAPITests {
     }
 
     @Test
+    public void test_getUpdatesSince() {
+        Set<String> updatedRecords = this.api.getUpdatesSince(new DateTime().minusDays(90),
+                Arrays.asList(new OdiloAPI.BoundedSearchType[]{
+                        OdiloAPI.BoundedSearchType.CREATED,
+                        OdiloAPI.BoundedSearchType.UPDATED}));
+
+        Set<String> deleted = this.api.getUpdatesSince(new DateTime().minusDays(90),
+                Arrays.asList(new OdiloAPI.BoundedSearchType[]{
+                        OdiloAPI.BoundedSearchType.DELETED}));
+
+        assert(updatedRecords.size()>0);
+    }
+
+    @Test
     public void test_getRecord() throws Exception {
 
-        List<String> ids = new ArrayList(this.api.getAllIds());
+        List<String> ids = new ArrayList(this.api.search("*"));
         assert(ids.size()>0);
 
         Random rand = new Random();
@@ -63,7 +73,7 @@ public class OdiloAPITests {
     @Test
     public void test_getISBNs() throws Exception {
 
-        List<String> ids = new ArrayList(this.api.getAllIds());
+        List<String> ids = new ArrayList(this.api.search("*"));
         assert(ids.size()>0);
 
 
@@ -88,7 +98,7 @@ public class OdiloAPITests {
 
     @Test
     public void test_makeHold() {
-        List<String> ids = new ArrayList(this.api.getAllIds());
+        List<String> ids = new ArrayList(this.api.search("*"));
         assert(ids.size()>0);
 
         Random rand = new Random();
@@ -98,17 +108,16 @@ public class OdiloAPITests {
         GetLoanablesResponse loanablesResponse = this.api.getCheckoutOptionsForRecord(recordId);
         assert(loanablesResponse != null);
 
-        ReserveResponse rt = this.api.holdItem(recordId, loanablesResponse.getRecordId());
+        HoldResponse rt = this.api.holdItem(recordId, loanablesResponse.getRecordId());
         assert(rt.getRecordId()!=null);
-        assert(rt.getReserveId()!=null);
          int ii = 0;
     }
 
     @Test
     public void test_releaseAllHolds() {
 
-        List<ReserveResponse> reserveList = this.api.getHolds();
-        for(ReserveResponse reserve : reserveList) {
+        List<HoldResponse> reserveList = this.api.getHolds();
+        for(HoldResponse reserve : reserveList) {
 
             this.api.releaseHold(reserve);
         }
@@ -117,7 +126,7 @@ public class OdiloAPITests {
     @Test
     public void test_makeCheckout() {
 
-        List<String> ids = new ArrayList(this.api.getAllIds());
+        List<String> ids = new ArrayList(this.api.search("*"));
         assert(ids.size()>0);
 
         Random rand = new Random();
@@ -132,7 +141,7 @@ public class OdiloAPITests {
     @Test
     public void test_returnCheckouts() {
 
-        List<String> ids = new ArrayList(this.api.getAllIds());
+        List<String> ids = new ArrayList(this.api.search("*"));
         assert(ids.size()>0);
 
         Random rand = new Random();
@@ -160,8 +169,8 @@ public class OdiloAPITests {
     @Test
     public void test_releaseHolds() {
 
-        List<ReserveResponse> reserveList = this.api.getHolds();
-        for(ReserveResponse reserve : reserveList) {
+        List<HoldResponse> reserveList = this.api.getHolds();
+        for(HoldResponse reserve : reserveList) {
 
             this.api.releaseHold(reserve);
         }
