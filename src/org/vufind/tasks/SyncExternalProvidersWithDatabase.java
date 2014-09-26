@@ -28,15 +28,16 @@ import java.util.concurrent.ForkJoinTask;
 public class SyncExternalProvidersWithDatabase {
 
     public static void main(String[] args) {
-        StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
-
         if (args.length < 1) {
-            System.out
-                    .println("Please enter the config file loc as the first param");
+            System.out.println("Please enter the config file loc as the first param");
             System.exit(-1);
         }
         String configFolder = args[0];
 
+        if(args.length > 1) {
+            ((LoggerContext) LoggerFactory.getILoggerFactory()).putProperty("guid", args[1]);
+        }
+        StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
 
         DynamicConfig config = new DynamicConfig();
         ConfigFiller.fill(config, Arrays.asList(BasicConfigOptions.values()), new File(configFolder));

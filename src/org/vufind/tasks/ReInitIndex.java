@@ -18,16 +18,17 @@ import java.util.function.Function;
  */
 public class ReInitIndex {
     public static void main(String[] args) {
-        StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
-
         logger.info("Starting ReInit");
         if (args.length < 1) {
-            System.out
-                    .println("Please enter the config file loc");
+            System.out.println("Please enter the config file loc");
             System.exit(-1);
         }
         String configFolder = args[0];
 
+        if(args.length > 1) {
+            ((LoggerContext) LoggerFactory.getILoggerFactory()).putProperty("guid", args[1]);
+        }
+        StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
 
         System.out.println("configFolder: "+configFolder);
 

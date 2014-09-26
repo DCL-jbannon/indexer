@@ -21,14 +21,16 @@ import java.util.function.Function;
  */
 public class SwapIndex {
     public static void main(String[] args) {
-        StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
-
         if (args.length < 1) {
-            System.out
-                    .println("Please enter params: 1 - configFile");
+            System.out.println("Please enter params: 1 - configFile");
             System.exit(-1);
         }
         String configFolder = args[0];
+
+        if(args.length > 1) {
+            ((LoggerContext) LoggerFactory.getILoggerFactory()).putProperty("guid", args[1]);
+        }
+        StatusPrinter.print((LoggerContext) LoggerFactory.getILoggerFactory());
 
         DynamicConfig config = new DynamicConfig();
         ConfigFiller.fill(config, Arrays.asList(BasicConfigOptions.values()), new File(configFolder));
