@@ -49,6 +49,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
     private PreparedStatement deleteEContentRecord;
 	private PreparedStatement deleteEContentItem;
     private PreparedStatement deleteEContentItemForRecord;
+    private PreparedStatement markEContentRecordDeleted;
 	private PreparedStatement doesGutenbergItemExist;
 	private PreparedStatement addGutenbergItem;
 	private PreparedStatement updateGutenbergItem;
@@ -129,6 +130,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
                     "marcRecord = ?, external_id = ? " +
                     "WHERE id = ?");
             deleteEContentRecord = econtentConn.prepareStatement("DELETE FROM econtent_record WHERE ilsId = ?");
+            markEContentRecordDeleted = econtentConn.prepareStatement("UPDATE econtent_record SET status = 'deleted' WHERE ilsId = ?");
             deleteEContentItem = econtentConn.prepareStatement("DELETE FROM econtent_item where id = ?");
             deleteEContentItemForRecord = econtentConn.prepareStatement("DELETE ei.* FROM dclecontent_prod.econtent_item ei, dclecontent_prod.econtent_record er WHERE er.ilsId = ? AND er.id = ei.recordId");
 
@@ -179,11 +181,8 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
             }
 
             if (recordStatus == MarcProcessor.RecordStatus.RECORD_DELETED) {
-                deleteEContentItemForRecord.setString(1, ilsId);
-                deleteEContentItemForRecord.executeUpdate();
-
-                deleteEContentRecord.setString(1, ilsId);
-                deleteEContentRecord.executeUpdate();
+                markEContentRecordDeleted.setString(1, ilsId);
+                markEContentRecordDeleted.executeUpdate();
 
                 return true;
             }
