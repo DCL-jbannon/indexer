@@ -55,7 +55,8 @@ public class OdiloEContentRecord extends EContentRecord {
             if (!"active".equals(getString("status"))) {
                 return null;
             }
-            return "Odilo";
+            return this.getString("source"); //Could be Odilo or Evoke
+            //return "Odilo";
         }
 
         return super.getSolrField(name, collectionGroupMap, itemTypeFormatMap, deviceCompatibilityMap, fullTextPath);
