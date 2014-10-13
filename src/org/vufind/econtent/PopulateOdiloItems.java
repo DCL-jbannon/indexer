@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.vufind.ConnectionProvider;
 import org.vufind.config.DynamicConfig;
+import org.vufind.config.sections.OdiloConfigOptions;
 import org.xml.sax.InputSource;
 
 import java.io.StringReader;
@@ -30,47 +31,26 @@ public class PopulateOdiloItems
     private OdiloAPI api;
     private DynamicConfig config;
 
-	public PopulateOdiloItems(OdiloAPI api, DynamicConfig config)
+    private String source;
+    private int updateFromDaysAgo;
+
+	public PopulateOdiloItems(OdiloAPI api, DynamicConfig config, String source, int updateFromDaysAgo)
 	{
 		this.api = api;
         this.config = config;
+        this.source = source;
+        this.updateFromDaysAgo = updateFromDaysAgo;
 	}
 
 	public void execute() throws SQLException 
 	{
-		logger.info("Started getting OverDrive API Collection");
+		logger.info("Started getting "+source+" API Collection");
 		int j = 0;
 		long totalItems = new Long("0");
 		JSONArray items = new JSONArray();
-        //this.api.login();
-        //Set<String> odiloIds = this.api.getAllIds();
 
-       /* PreparedStatement setAsEvoke_PS = ConnectionProvider
-                .getConnection(config, ConnectionProvider.PrintOrEContent.E_CONTENT)
-                .prepareStatement(
-                        "UPDATE econtent_record " +
-                        "SET source = 'Odilo', external_id = ? " +
-                        "WHERE " +
-                            "accessType = 'acs' AND isbn like ?");
-
-        for(String odiloId : odiloIds) {
-            String isbn = api.getISBN(odiloId);
-            logger.debug("Setting odiloId["+odiloId+"] isbn["+isbn+"]");
-
-            setAsEvoke_PS.setString(1, odiloId);
-            setAsEvoke_PS.setString(2, isbn+"%");
-            int affectedRows = setAsEvoke_PS.executeUpdate();
-            if(affectedRows != 1) {
-                logger.info("Couldn't find a match for Odilo item");
-            } else {
-                int ii = 0;
-                ii++;
-            }
-
-		}*/
-
-        this.syncSince(new DateTime().minusDays(90));
-		logger.info("Finished Odilo");
+        this.syncSince(new DateTime().minusDays(updateFromDaysAgo));
+		logger.info("Finished "+source);
 	}
 
     private RecordStack recordStack = new RecordStack();
@@ -146,7 +126,7 @@ public class PopulateOdiloItems
             econtentRecord.set("subtitle", apiRecord.getSubtitle());
             econtentRecord.set("target_audience", apiRecord.getTargetAudience());
             econtentRecord.set("title", apiRecord.getTitle());
-            econtentRecord.set("source", "Odilo");
+            econtentRecord.set("source", source);
 
             dao.save(econtentRecord);
         } catch (SQLException e) {

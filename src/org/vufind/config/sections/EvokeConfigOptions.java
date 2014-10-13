@@ -8,7 +8,7 @@ import java.util.function.Function;
 /**
  * Created by jbannon on 7/7/14.
  */
-public enum OdiloConfigOptions implements I_ConfigOption {
+public enum EvokeConfigOptions implements I_ConfigOption {
     USER(ConfigMethods::fillSimpleString, false),
     PASS(ConfigMethods::fillSimpleString, false),
     URL(ConfigMethods::fillSimpleString, false),
@@ -18,7 +18,7 @@ public enum OdiloConfigOptions implements I_ConfigOption {
     final private Function fillFunction;
     final private boolean isList;
 
-    OdiloConfigOptions(Function fillFunction, boolean isList) {
+    EvokeConfigOptions(Function fillFunction, boolean isList) {
         this.isList = isList;
         this.fillFunction = fillFunction;
     }
