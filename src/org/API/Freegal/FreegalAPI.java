@@ -66,8 +66,9 @@ public class FreegalAPI {
             genreDoc = db.parse(genreUrl);
         } catch (SAXException | IOException e) {
             logger.error("Error while reading Freegal URL", e);
-            try {Thread.sleep(4000);} catch (InterruptedException e1) {e1.printStackTrace();}
+            try {Thread.sleep(20000);} catch (InterruptedException e1) {e1.printStackTrace();}
             try {
+                db = documentBuilderFactory.newDocumentBuilder();
                 genreDoc = db.parse(genreUrl);
             } catch (SAXException | IOException ee) {
                 logger.error("Failed twice to read Freegal URL", ee);
@@ -134,10 +135,18 @@ public class FreegalAPI {
 		// Group the songs by album
 		for (int j = 0; j < songs.getLength(); j++) {
 			Element songNode = (Element) songs.item(j);
-			NodeList tags = songNode.getElementsByTagName("Title");
+            NodeList albumIdTags = songNode.getElementsByTagName("ReferenceID");
+            Long albumId = -1L;
+            try {
+                albumId = albumIdTags.getLength() > 0 ? Long.parseLong(albumIdTags.item(0).getTextContent()) : -1;
+            } catch(Exception e) {
+                continue;
+            }
+            NodeList tags = songNode.getElementsByTagName("Title");
 			String text = tags.getLength() > 0 ? tags.item(0).getTextContent() : null; 
 			if (text != null) {
 				Album album = new Album();
+                album.setExternalId(albumId);
 				album.setTitle(text);
 				
 				tags = songNode.getElementsByTagName("ArtistText");
