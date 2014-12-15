@@ -31,8 +31,16 @@ public class FreegalImporter implements I_ExternalImporter {
         logger.info("Importing Freegal API Items");
 
 		try {
-			EContentRecordDAO dao = this.eContentRecordDAO;
+			Collection<String> genres = new HashSet<String>();
+            genres.addAll(freegalAPI.getAllGenres());
+            if(genres.size()<1){
+                logger.error("Couldn't get Freegal Genres");
+                return;//Everything is busted so lets stick with the Freegal content we already know about
+            } else {
+                logger.info("Number of Freegal Genres found: " + genres.size());
+            }
 
+            EContentRecordDAO dao = this.eContentRecordDAO;
             try {
                 dao.flagAllFreegalRecordsAsDeleted();
             } catch (SQLException e) {
@@ -40,19 +48,10 @@ public class FreegalImporter implements I_ExternalImporter {
                 return;
             }
 
-
-			Collection<String> genres = new HashSet<String>();
-            genres.addAll(freegalAPI.getAllGenres());
-            if(genres.size()<1){
-                logger.error("Number of Freegal Genres found: " + genres.size());
-            } else {
-                logger.info("Number of Freegal Genres found: " + genres.size());
-            }
-
             int songsAdded = 0;
 
             // Remove all existing songs for the album from the
-            // database since freegal doesn't keep unique ids
+            // database since freegal doesn't keep unique ids //Josh: this is totally not true, but apparently we're deleting them daily for political/contract reasons.
             dao.deleteFreegalItems();
 			for (String genre : genres) {
                 ArrayList<Album> albums = new ArrayList(freegalAPI.getAlbums(genre));
@@ -77,8 +76,12 @@ public class FreegalImporter implements I_ExternalImporter {
             logger.debug("Processing album " + album.getTitle()
                     + " the album has " + album.getSongs().size()
                     + " songs");
-            EContentRecord record = this.eContentRecordDAO.findByTitleAndAuthor(
-                    album.getTitle(), album.getAuthor());
+            EContentRecord record = this.eContentRecordDAO.findByExternalId(album.getExternalId()+"");
+            if(record == null){
+                //Temporary hack while we're getting Ids put in
+                record = this.eContentRecordDAO.findByTitleAndAuthor(album.getTitle(), album.getAuthor());
+            }
+
             boolean added = false;
             if (record == null) {
                 // create new record
@@ -90,11 +93,11 @@ public class FreegalImporter implements I_ExternalImporter {
                 record.set("availableCopies", 1);
                 added = true;
             } else {
-
                 // set date updated
                 record.set("date_updated",
                         (int) (new Date().getTime() / 100));
             }
+            record.set("external_id", album.getExternalId());
             record.set("status", "active");
             record.set("title", album.getTitle());
             record.set("author", album.getAuthor());
@@ -104,6 +107,7 @@ public class FreegalImporter implements I_ExternalImporter {
             record.set("genre", album.getGenre());
             record.set("collection", album.getCollection());
             record.set("cover", album.getCoverUrl());
+            record.set("last_touched", new Date());
 
             record.set("addedBy", -1);
 
