@@ -68,6 +68,9 @@ public class SyncExternalProvidersWithDatabase {
         ForkJoinTask task = forkJoinPool.submit(()->
                 importers.parallelStream().forEach((importer) -> importer.importRecords()));
         task.join();
+
+        task = forkJoinPool.submit(()->importers.parallelStream().forEach((importer) -> importer.finish()));
+        task.join();
     }
 
     private List<I_ExternalImporter> loadImporters() {

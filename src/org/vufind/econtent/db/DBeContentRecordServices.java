@@ -71,8 +71,8 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
 	{
         if(insertRecordStatement==null) {
             insertRecordStatement = this.conn.prepareStatement(
-                "INSERT INTO " + DBeContentRecordServices.tableName + "(`title`,`subTitle`,`accessType`, `author`, `source`, `sourceUrl`, `date_added`, `publisher`, `isbn`, `genre`, `external_id`) " +
-                "VALUES (?, ?, 'free', ?, 'OverDriveAPI', ?, ?, ?, ?, ?, ?)");
+                "INSERT INTO " + DBeContentRecordServices.tableName + "(`title`,`subTitle`,`accessType`, `author`, `source`, `sourceUrl`, `date_added`, `publisher`, `isbn`, `genre`, `external_id`, `last_touched`) " +
+                "VALUES (?, ?, 'free', ?, 'OverDriveAPI', ?, ?, ?, ?, ?, ?, NOW())");
         }
 
 		long unixTime = System.currentTimeMillis() / 1000L;
@@ -122,12 +122,23 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
                 "	  , `genre` = ? "+
                 "	  , `isbn` = ? "+
                 "	  , `external_id` = ? "+
+                "	  , `status` = ? " +
+                "     , `last_touched` = NOW()"+
                 "	  WHERE `id` = ?");
         }
 
 		long unixTime = System.currentTimeMillis() / 1000L;
 		String overDriveId = (String) item.get("id");
+
 		String title = (String) item.get("title");
+        boolean isOwned = false;
+        //int copiesOwned = 0;
+        try{
+            //copiesOwned = Integer.parseInt(item.get("copiesOwned").toString());
+            isOwned = Boolean.parseBoolean(item.get("isOwnedByCollections").toString());
+        } catch(Exception e){
+            e.printStackTrace();
+        }
 		String subtitle = "" + (String) item.get("subtitle");
 		String author = this.overDriveApiUtils.getAuthorFromAPIItem(item);
 		String publisher = "" + (String) item.get("publisher");
@@ -146,7 +157,8 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
             updateRecordStatement.setString(7, "" + mediaType);
             updateRecordStatement.setString(8, "" + isbn);
             updateRecordStatement.setString(9, "" + overDriveId);
-            updateRecordStatement.setString(10, "" + recordId);
+            updateRecordStatement.setString(10, isOwned ? "active" : "deleted");
+            updateRecordStatement.setString(11, "" + recordId);
             updateRecordStatement.execute();
 		}
 		catch(Exception e)
@@ -156,4 +168,18 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
 		}
 		return true;
 	}
+
+    private PreparedStatement touchRecordStatement = null;
+    public Boolean touch(String recordId) throws SQLException {
+        if (touchRecordStatement == null) {
+            touchRecordStatement = this.conn.prepareStatement(
+                    "UPDATE `econtent_record` " +
+                            "	  SET `last_touched` = NOW()" +
+                            "	  WHERE `id` = ?");
+        }
+        touchRecordStatement.setString(1, recordId);
+        touchRecordStatement.execute();
+
+        return true;
+    }
 }

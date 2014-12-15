@@ -102,6 +102,10 @@ public class OverDriveEContentRecord extends EContentRecord {
     }
 
     private String getOverDriveId() {
+        String overDriveId = getString("external_id");
+        if(overDriveId != null && overDriveId.length()>0) {
+            return overDriveId;
+        }
         String sourceUrl = getString("sourceUrl");
         if (sourceUrl == null || sourceUrl.length() == 0) {
             return null;
@@ -110,7 +114,7 @@ public class OverDriveEContentRecord extends EContentRecord {
                 "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}",
                 Pattern.CANON_EQ);
         Matcher RegexMatcher = Regex.matcher(sourceUrl);
-        String overDriveId = null;
+        overDriveId = null;
         if (RegexMatcher.find()) {
             overDriveId = RegexMatcher.group();
         }

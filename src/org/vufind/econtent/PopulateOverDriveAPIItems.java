@@ -56,15 +56,22 @@ public class PopulateOverDriveAPIItems
         this.config = config;
 	}
 
-    private class OverDriveTouple {
+    private class OverDriveTuple {
         public final String id;
         public final String source;
         public final String overDriveId;
 
-        public OverDriveTouple(String id, String source, String overDriveId) {
+        private boolean needsUpdate; // We need to force an update because the external_id is not set
+
+        public OverDriveTuple(String id, String source, String overDriveId, boolean needsUpdate) {
             this.id = id;
             this.source = source;
             this.overDriveId = overDriveId;
+            this.needsUpdate = needsUpdate;
+        }
+
+        public boolean needsUpdate() {
+            return needsUpdate;
         }
 
         public String getRecordKey() {
@@ -76,7 +83,7 @@ public class PopulateOverDriveAPIItems
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
 
-            OverDriveTouple that = (OverDriveTouple) o;
+            OverDriveTuple that = (OverDriveTuple) o;
 
             if (!id.equals(that.id)) return false;
             if (!overDriveId.equals(that.overDriveId)) return false;
@@ -96,33 +103,40 @@ public class PopulateOverDriveAPIItems
     private String guidRegex = "([0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12})";
     private Pattern guidPattern = Pattern.compile(guidRegex);
 
-    private Map<String, OverDriveTouple> getOverDriveRecords() throws SQLException{
-        HashMap<String, OverDriveTouple> records = new HashMap();
+    private Map<String, OverDriveTuple> getOverDriveRecords() throws SQLException{
+        HashMap<String, OverDriveTuple> records = new HashMap();
         PreparedStatement getOverDriveRecords_PS = this.econtentConnection.prepareStatement(
-                "SELECT id, sourceURL, source " +
+                "SELECT id, sourceURL, source, external_id " +
                 "FROM econtent_record " +
                 "WHERE " +
                     "(source = 'OverDrive' OR source = 'OverDriveAPI')");
         ResultSet rs = getOverDriveRecords_PS.executeQuery();
-        //TODO - This is so stupid. We need to add a "SourceID" column to econtent_record
+
         while(rs.next()) {
             String id = rs.getString(1);
             String sourceURL = rs.getString(2);
             String source = rs.getString(3);
-            Matcher m = guidPattern.matcher(sourceURL);
-            if(m.find()) {
-                String guid = m.group();
-                OverDriveTouple odTouple = new OverDriveTouple(id, source, guid);
-                checkAndStoreRecord(records, odTouple);
+            String externalId = rs.getString(4);
+
+            if(externalId != null && externalId.equals("")) {
+                OverDriveTuple odTuple = new OverDriveTuple(id, source, externalId.toUpperCase(), false);
+                checkAndStoreRecord(records, odTuple);
+            } else {
+                Matcher m = guidPattern.matcher(sourceURL);
+                if (m.find()) {
+                    String guid = m.group();
+                    OverDriveTuple odTouple = new OverDriveTuple(id, source, guid.toUpperCase(), true);
+                    checkAndStoreRecord(records, odTouple);
+                }
             }
         }
 
         return records;
     }
 
-    private void checkAndStoreRecord(HashMap<String, OverDriveTouple> records, OverDriveTouple newRecord) {
+    private void checkAndStoreRecord(HashMap<String, OverDriveTuple> records, OverDriveTuple newRecord) {
         if(records.containsKey(newRecord.getRecordKey())) {
-            OverDriveTouple oldRecord = records.get(newRecord.getRecordKey());
+            OverDriveTuple oldRecord = records.get(newRecord.getRecordKey());
             if(newRecord.source.equals(oldRecord.source)) {
                 logger.error("Duplicated OverDrive records ["+oldRecord.id+", "+ newRecord.id+"]");
                 //Delete the newest duplicate record
@@ -175,7 +189,7 @@ public class PopulateOverDriveAPIItems
         );
         deleteDuplicatedOverDriveRecords_PS.executeUpdate();
 
-        Map<String, OverDriveTouple> recordsMap = getOverDriveRecords();
+        Map<String, OverDriveTuple> recordsMap = getOverDriveRecords();
 
 		while (this.overDriveAPICollectionIterator.hasNext())
 		{
@@ -201,10 +215,11 @@ public class PopulateOverDriveAPIItems
 				JSONObject item = (JSONObject) items.get(i);
 				String overDriveId = (String) item.get("id");
 
-                OverDriveTouple fromAPITouple = new OverDriveTouple(null, "OverDriveAPI", overDriveId);
-                OverDriveTouple existingRecord = recordsMap.get(fromAPITouple.getRecordKey());
+                OverDriveTuple fromAPITouple = new OverDriveTuple(null, "OverDriveAPI", overDriveId.toUpperCase(), true);
+                OverDriveTuple existingRecord = recordsMap.get(fromAPITouple.getRecordKey());
                 if(existingRecord != null && existingRecord.source.equals("OverDrive")) {
-                    //Don't do anything. The Marc version takes precedence.
+                    //Don't do anything except for updating "last_touched". The Marc version takes precedence.
+                    this.eContentRecordDAO.touch(existingRecord.id);
                 } else {
 
                     if(existingRecord == null) {
@@ -219,10 +234,11 @@ public class PopulateOverDriveAPIItems
                             logger.error("Could not add OverDrive API Item: ", e);
                             e.printStackTrace();
                         }
-                    } else if(config.getBool(OverDriveConfigOptions.UPDATE_ALL)) {
+                    } else if(config.getBool(OverDriveConfigOptions.UPDATE_ALL) || existingRecord.needsUpdate()) {
                         try
                         {
                             JSONObject itemMetadata = this.overDriveApiServices.getItemMetadata(overDriveId);
+                            itemMetadata.put("id", itemMetadata.get("id").toString().toUpperCase());
                             logger.debug("Update OverDrive API Item" + overDriveId);
                             this.eContentRecordDAO.updateOverDriveAPIItem(existingRecord.id, itemMetadata);
                         }
@@ -231,11 +247,22 @@ public class PopulateOverDriveAPIItems
                             logger.error("Error Updating  " + overDriveId + "API Item to the Database: ", e);
                         }
                     }  else {
+                        this.eContentRecordDAO.touch(existingRecord.id);
                         logger.debug("Skip record[" + overDriveId+"] nothing to do.");
                     }
                 }
 			}
 		}
+
+        // Delete any that didn't get touched
+        PreparedStatement markUntouchedOverDriveAsDeleted = this.econtentConnection.prepareStatement(
+            "UPDATE econtent_record er " +
+            "SET `status` = 'deleted' " +
+            "WHERE last_touched < DATE_SUB(NOW(), INTERVAL 20 HOUR) AND source = 'OverDrive' OR source = 'OverDrive API'"
+        );
+
+        markUntouchedOverDriveAsDeleted.execute();
+
 		logger.info("Processed " + j + " items from OverDrive API");
 		logger.info("Finished getting OverDrive API Collection");
 	}

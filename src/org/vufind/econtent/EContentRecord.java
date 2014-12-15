@@ -412,13 +412,28 @@ public class EContentRecord {
 		return rating == null ? -2.5 : rating;
 	}
 
-	private String translateValue(Properties map, String value) {
-		value = map.getProperty(value);
-		if (value != null) {
-			value = value.replaceAll("^\"|\"$", "");
-		}
-		return value;
+	private String translateValue(Properties map, String inVal) {
+		String outVal = translateCaseSensitive(map, inVal);
+        if(outVal!=null) {
+            return outVal;
+        } else {
+            outVal = translateCaseSensitive(map, inVal.toLowerCase());
+            if(outVal!=null) {
+                return outVal;
+            } else {
+                outVal = translateCaseSensitive(map, inVal.toUpperCase());
+            }
+        }
+		return outVal;
 	}
+
+    private String translateCaseSensitive(Properties map, String inVal) {
+        String outVal = map.getProperty(inVal);
+        if (outVal != null) {
+            outVal = outVal.replaceAll("^\"|\"$", "");
+        }
+        return outVal;
+    }
 
 	protected String readFile(File file) throws IOException {
 		BufferedReader reader = new BufferedReader(new FileReader(file));

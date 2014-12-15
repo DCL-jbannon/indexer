@@ -418,6 +418,9 @@ public class EContentRecordDAO {
                 } else {
                     stmt.setLong(index, record.getLong(column));
                 }
+            } else if(column.equals("last_touched")) {
+
+                stmt.setTimestamp(index, new java.sql.Timestamp(((java.util.Date)record.get(column)).getTime()));
             } else {
                 stmt.setString(index, record.getString(column));
             }

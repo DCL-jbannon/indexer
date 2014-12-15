@@ -11,4 +11,5 @@ public interface IDBeContentRecordServices {
 	public Boolean deleteRecordById(String id) throws SQLException;
 	public String getRecordId(String overDriveID, String source) throws SQLException;
 	public Boolean updateOverDriveAPIItem(String recordId, JSONObject item) throws SQLException;
+    public Boolean touch(String recordId) throws SQLException;
 }
