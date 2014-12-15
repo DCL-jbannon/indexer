@@ -4,17 +4,17 @@ import java.util.ArrayList;
 import java.util.HashSet;
 
 public class Album {
-	private long recordId = -1;
+	private long externalId = -1;
 	private String title;
 	private String author;
 	private String genre;
 	private String coverUrl;
 	private ArrayList<Song> songs = new ArrayList<Song>();
-	public long getRecordId() {
-		return recordId;
+	public long getExternalId() {
+		return externalId;
 	}
-	public void setRecordId(long recordId) {
-		this.recordId = recordId;
+	public void setExternalId(long recordId) {
+		this.externalId = recordId;
 	}
 	public String getTitle() {
 		return title;
