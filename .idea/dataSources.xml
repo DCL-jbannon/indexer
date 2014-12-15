@@ -6,10 +6,6 @@
       <synchronize>true</synchronize>
       <jdbc-driver>com.mysql.jdbc.Driver</jdbc-driver>
       <jdbc-url>jdbc:mysql://VuFindMYSQL02.dcl.lan:3306/dclecontent_prod</jdbc-url>
-      <user-name>dclvufind</user-name>
-      <user-password>dfeedfc9dfe6dfdcdfccdf8bdfc4dfce</user-password>
-      <schema-pattern>dclecontent_prod.* dclvufind_prod.*</schema-pattern>
-      <default-schemas>dclecontent_prod.* dclvufind_prod.*</default-schemas>
       <driver-properties>
         <property name="zeroDateTimeBehavior" value="convertToNull" />
         <property name="tinyInt1isBit" value="false" />
