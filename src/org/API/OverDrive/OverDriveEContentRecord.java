@@ -123,14 +123,21 @@ public class OverDriveEContentRecord extends EContentRecord {
 
     private Set<String> getOverDriveFormats(OverDriveAPIServices overDriveAPIServices, String overDriveId) {
         Set<String> formats = new HashSet<String>();
-        JSONObject meta = overDriveAPIServices.getItemMetadata(overDriveId);
-        if (meta != null) {
-            List jsonFormats = (List) meta.get("formats");
-            for (Object o : jsonFormats) {
-                Map m = (Map) o;
-                formats.add((String) m.get("name"));
+        try{
+            JSONObject meta = overDriveAPIServices.getItemMetadata(overDriveId);
+            if (meta != null) {
+                List jsonFormats = (List) meta.get("formats");
+                for (Object o : jsonFormats) {
+                    Map m = (Map) o;
+                    formats.add((String) m.get("name"));
+                }
             }
+        } catch(Exception e)
+        {
+            //OverDrive has started returning items with no "formats" which was blowing up here, so we're swallowing errors.
+            e.printStackTrace();
         }
+
         return formats;
     }
 
