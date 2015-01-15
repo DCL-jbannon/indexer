@@ -86,8 +86,10 @@ public class SystemLists {
             String line = reader.readLine();
             int lineNumber = 0;
             while (line != null){
-                if (lineNumber >= 2 && line.trim().length() > 0){
-                    //The line is not a header line
+
+                if (line.trim().length() > 0){
+                //if (lineNumber >= 2 && line.trim().length() > 0){
+                    //The line is not a header line  // Ughhh... we don't have headers
                     //line format is Bib#|Collection|Call|Title|ISN
                     String[] fields = line.split("\\|");
                     if (fields.length > 0 && fields[0].length() > 0){
