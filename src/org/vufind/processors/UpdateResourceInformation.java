@@ -74,6 +74,7 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 		// Load configuration
         this.config = config;
         ConfigFiller.fill(config, UpdateResourcesConfigOptions.values(), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
+        ConfigFiller.fill(config, MarcConfigOptions.values(), new File(config.getString(BasicConfigOptions.CONFIG_FOLDER)));
 
         Connection vufindConn = ConnectionProvider.getConnection(config, ConnectionProvider.PrintOrEContent.PRINT);
 
@@ -470,47 +471,53 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 
     @Override
 	public void finish() {
-		if (config.getBool(MarcConfigOptions.REMOVE_RECORDS_NOT_IN_MARC_EXPORT)){          //....
-			
-			//Mark any resources that no longer exist as deleted.
-			int numResourcesToDelete = 0;
-			for (BasicResourceInfo resourceInfo : existingResources.values()){
-				if (resourceInfo.getDeleted() == false){
-					numResourcesToDelete++;
-				}
-			}
+        try {
 
-            logger.info("Deleting resources that no longer from resources table, there are " + numResourcesToDelete + " of "+ existingResources.size() + " resources to be deleted.");
-			int maxResourcesToDelete = 100;
-			int numResourcesAdded = 0;
-			for (BasicResourceInfo resourceInfo : existingResources.values()){
-				if (resourceInfo.getDeleted() == false){
-					try {
-						deleteResourceStmt.setLong(++numResourcesAdded, resourceInfo.getResourceId());
-						if (numResourcesAdded == maxResourcesToDelete){
-							deleteResourceStmt.executeUpdate();
-							numResourcesAdded = 0;
-						}
-					} catch (SQLException e) {
-						logger.error("Unable to delete resources", e);
-						break;
-					}
-				}
-			}
-			if (numResourcesAdded > 0 && numResourcesAdded == maxResourcesToDelete){
-				try {
-					for (int i = numResourcesAdded + 1; i < maxResourcesToDelete; i++){
-						deleteResourceStmt.setLong(i, -1);
-					}
-					if (numResourcesAdded == maxResourcesToDelete){
-						deleteResourceStmt.executeUpdate();
-						numResourcesAdded = 0;
-					}
-				} catch (SQLException e) {
-					logger.error("Unable to delete final resources", e);
-				}
-			}
-		}
+
+            if (config.getBool(MarcConfigOptions.REMOVE_RECORDS_NOT_IN_MARC_EXPORT)) {          //....
+
+                //Mark any resources that no longer exist as deleted.
+                int numResourcesToDelete = 0;
+                for (BasicResourceInfo resourceInfo : existingResources.values()) {
+                    if (resourceInfo.getDeleted() == false) {
+                        numResourcesToDelete++;
+                    }
+                }
+
+                logger.info("Deleting resources that no longer from resources table, there are " + numResourcesToDelete + " of " + existingResources.size() + " resources to be deleted.");
+                int maxResourcesToDelete = 100;
+                int numResourcesAdded = 0;
+                for (BasicResourceInfo resourceInfo : existingResources.values()) {
+                    if (resourceInfo.getDeleted() == false) {
+                        try {
+                            deleteResourceStmt.setLong(++numResourcesAdded, resourceInfo.getResourceId());
+                            if (numResourcesAdded == maxResourcesToDelete) {
+                                deleteResourceStmt.executeUpdate();
+                                numResourcesAdded = 0;
+                            }
+                        } catch (SQLException e) {
+                            logger.error("Unable to delete resources", e);
+                            break;
+                        }
+                    }
+                }
+                if (numResourcesAdded > 0 && numResourcesAdded == maxResourcesToDelete) {
+                    try {
+                        for (int i = numResourcesAdded + 1; i < maxResourcesToDelete; i++) {
+                            deleteResourceStmt.setLong(i, -1);
+                        }
+                        if (numResourcesAdded == maxResourcesToDelete) {
+                            deleteResourceStmt.executeUpdate();
+                            numResourcesAdded = 0;
+                        }
+                    } catch (SQLException e) {
+                        logger.error("Unable to delete final resources", e);
+                    }
+                }
+            }
+        }catch(Exception e) {
+            e.printStackTrace();
+        }
 	}
 
 	@Override
