@@ -251,23 +251,23 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 					createEContentRecord.setString(3, source);
 					createEContentRecord.setString(4, Util.trimTo(255, recordInfo.getFirstFieldValueInSet("title_short")));
 					createEContentRecord.setString(5, Util.trimTo(255, recordInfo.getFirstFieldValueInSet("title_sub")));
-					createEContentRecord.setString(6, recordInfo.getFirstFieldValueInSet("author"));
+					createEContentRecord.setString(6, Util.trimTo(255, recordInfo.getFirstFieldValueInSet("author")));
 					createEContentRecord.setString(7, Util.getCRSeparatedString(recordInfo.getMappedField("author2")));
 					createEContentRecord.setString(8, recordInfo.getDescription());
 					createEContentRecord.setString(9, Util.getCRSeparatedString(recordInfo.getMappedField("contents")));
 					createEContentRecord.setString(10, Util.getCRSeparatedString(recordInfo.getMappedField("topic_facet")));
-					createEContentRecord.setString(11, recordInfo.getFirstFieldValueInSet("language"));
-					createEContentRecord.setString(12, recordInfo.getFirstFieldValueInSet("publisher"));
-					createEContentRecord.setString(13, recordInfo.getFirstFieldValueInSet("edition"));
-					createEContentRecord.setString(14, Util.trimTo(500, Util.getCRSeparatedString(recordInfo.getMappedField("isbn"))));
-					createEContentRecord.setString(15, Util.getCRSeparatedString(recordInfo.getMappedField("issn")));
-					createEContentRecord.setString(16, recordInfo.getFirstFieldValueInSet("language"));
-					createEContentRecord.setString(17, recordInfo.getFirstFieldValueInSet("lccn"));
+					createEContentRecord.setString(11, Util.trimTo(255, recordInfo.getFirstFieldValueInSet("language")));
+					createEContentRecord.setString(12, Util.trimTo(255, recordInfo.getFirstFieldValueInSet("publisher")));
+					createEContentRecord.setString(13, Util.trimTo(255, recordInfo.getFirstFieldValueInSet("edition")));
+					createEContentRecord.setString(14, Util.trimTo(255, Util.trimTo(500, Util.getCRSeparatedString(recordInfo.getMappedField("isbn")))));
+					createEContentRecord.setString(15, Util.trimTo(255, Util.getCRSeparatedString(recordInfo.getMappedField("issn"))));
+					createEContentRecord.setString(16, Util.trimTo(255, recordInfo.getFirstFieldValueInSet("language")));
+					createEContentRecord.setString(17, Util.trimTo(255, recordInfo.getFirstFieldValueInSet("lccn")));
 					createEContentRecord.setString(18, Util.getCRSeparatedString(recordInfo.getMappedField("topic")));
 					createEContentRecord.setString(19, Util.getCRSeparatedString(recordInfo.getMappedField("genre")));
-					createEContentRecord.setString(20, Util.getCRSeparatedString(recordInfo.getMappedField("geographic")));
-					createEContentRecord.setString(21, Util.getCRSeparatedString(recordInfo.getMappedField("era")));
-					createEContentRecord.setString(22, Util.getCRSeparatedString(recordInfo.getMappedField("target_audience")));
+					createEContentRecord.setString(20, Util.trimTo(255, Util.getCRSeparatedString(recordInfo.getMappedField("geographic"))));
+					createEContentRecord.setString(21, Util.trimTo(255, Util.getCRSeparatedString(recordInfo.getMappedField("era"))));
+					createEContentRecord.setString(22, Util.trimTo(255, Util.getCRSeparatedString(recordInfo.getMappedField("target_audience"))));
 					String sourceUrl = "";
                     String externalId = "";
 					if (recordInfo.getSourceUrls().size() == 1){
@@ -283,14 +283,14 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
                             }
                         }
 					}
-					createEContentRecord.setString(23, sourceUrl);
-					createEContentRecord.setString(24, recordInfo.getPurchaseUrl());
-					createEContentRecord.setString(25, recordInfo.getFirstFieldValueInSet("publishDate"));
-					createEContentRecord.setString(26, recordInfo.getFirstFieldValueInSet("ctrlnum"));
+					createEContentRecord.setString(23, Util.trimTo(255, sourceUrl));
+					createEContentRecord.setString(24, Util.trimTo(500, recordInfo.getPurchaseUrl()));
+					createEContentRecord.setString(25, Util.trimTo(100, recordInfo.getFirstFieldValueInSet("publishDate")));
+					createEContentRecord.setString(26, Util.trimTo(100, recordInfo.getFirstFieldValueInSet("ctrlnum")));
 					createEContentRecord.setString(27, accessType);
 					createEContentRecord.setLong(28, new Date().getTime() / 1000);
 					createEContentRecord.setString(29, recordInfo.toString());
-                    createEContentRecord.setString(30, externalId);
+                    createEContentRecord.setString(30, Util.trimTo(40, externalId));
 					int rowsInserted = createEContentRecord.executeUpdate();
 					if (rowsInserted != 1){
 						logger.error("Could not insert row into the database");
