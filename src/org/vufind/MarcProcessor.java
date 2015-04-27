@@ -141,14 +141,14 @@ public class MarcProcessor {
         econtentConn = ConnectionProvider.getConnection(config, ConnectionProvider.PrintOrEContent.E_CONTENT);
 
 		try {
-			PreparedStatement existingRecordChecksumsStmt = vufindConn.prepareStatement("SELECT * FROM marc_import");
+			//PreparedStatement existingRecordChecksumsStmt = vufindConn.prepareStatement("SELECT * FROM marc_import");
+            PreparedStatement existingRecordChecksumsStmt = vufindConn.prepareStatement("SELECT record_id as id, marc_checksum as checksum, source  FROM resource");
 			ResultSet existingRecordChecksumsRS = existingRecordChecksumsStmt.executeQuery();
 			while (existingRecordChecksumsRS.next()) {
 				MarcIndexInfo marcInfo = new MarcIndexInfo();
 				marcInfo.setChecksum(existingRecordChecksumsRS.getLong("checksum"));
-				marcInfo.setBackupChecksum(existingRecordChecksumsRS.getLong("backup_checksum"));
-				marcInfo.setEContent(existingRecordChecksumsRS.getBoolean("eContent"));
-				marcInfo.setBackupEContent(existingRecordChecksumsRS.getBoolean("backup_eContent"));
+                String source = existingRecordChecksumsRS.getString("source");
+				marcInfo.setEContent(source!=null && source.equals("eContent"));
 				marcIndexInfo.put(existingRecordChecksumsRS.getString("id"), marcInfo);
 			}
 		} catch (SQLException e) {
@@ -522,26 +522,19 @@ public class MarcProcessor {
 	}
 
     public RecordStatus calculateRecordStatus(Record record, MarcRecordDetails marcInfo) {
-        MarcIndexInfo marcIndexedInfo = null;
-
+        MarcIndexInfo marcFromIndex = null;
         if(record.getLeader().getRecordStatus()=='d') {
             //deleted record
             logger.debug("Record is deleted");
             return RecordStatus.RECORD_DELETED;
 
         } else if (marcIndexInfo.containsKey(marcInfo.getId())) {
-            marcIndexedInfo = marcIndexInfo.get(marcInfo.getId());
-            if (marcInfo.getChecksum() != marcIndexedInfo.getChecksum()){
+            marcFromIndex = marcIndexInfo.get(marcInfo.getId());
+            if (marcInfo.getChecksum() != marcFromIndex.getChecksum()){
                 logger.debug("Record is changed - checksum");
                 return RecordStatus.RECORD_CHANGED;
-            }else if (marcInfo.getChecksum() != marcIndexedInfo.getBackupChecksum()){
-                logger.debug("Record is changed - backup checksum");
-                return RecordStatus.RECORD_CHANGED;
-            }else if (marcInfo.isEContent() != marcIndexedInfo.isEContent()){
+            } else if (marcInfo.isEContent() != marcFromIndex.isEContent()){
                 logger.debug("Record is changed - econtent");
-                return RecordStatus.RECORD_CHANGED;
-            }else if (marcInfo.isEContent() != marcIndexedInfo.isBackupEContent()) {
-                logger.debug("Record is changed - backup econtent");
                 return RecordStatus.RECORD_CHANGED;
             } else {
                 logger.debug("Record is unchanged");
