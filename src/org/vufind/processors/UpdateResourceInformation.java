@@ -131,7 +131,7 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
                             "SELECT id " +
                             "FROM resource " +
                             "WHERE record_id = ? " +
-                            "ORDER BY deleted ASC, id ASC) AS r1 " +
+                            "ORDER BY id ASC) AS r1 " +
                             "LIMIT 1", ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
 
             transferCommentsStmt = vufindConn.prepareStatement("UPDATE comments SET resource_id = ? WHERE resource_id = ?");
@@ -270,7 +270,7 @@ public class UpdateResourceInformation implements IMarcRecordProcessor, IEConten
 	}
 
 	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
-        logger.debug("Processing record: "+recordInfo.getId());
+        logger.debug("Updating database record: "+recordInfo.getId());
 		Long resourceId = -1L;
 		
 		boolean updateSubjectAndCallNumber = true;
