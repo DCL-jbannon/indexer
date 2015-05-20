@@ -39,7 +39,7 @@ public class OverDriveAPIUtils implements IOverDriveAPIUtils
 			JSONObject authors = (JSONObject) pc.get(0);
 			return (String) authors.get("name");
 		}
-		catch (NullPointerException e)
+		catch (Exception e)
 		{
 			return "";
 		}
@@ -70,7 +70,7 @@ public class OverDriveAPIUtils implements IOverDriveAPIUtils
 			}
 			return isbn;
 		}
-		catch (NullPointerException e)
+		catch (Exception e)
 		{
 			//System.out.println(e.getMessage());
 			return null;

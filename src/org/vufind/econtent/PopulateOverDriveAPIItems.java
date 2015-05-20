@@ -219,7 +219,7 @@ public class PopulateOverDriveAPIItems
                 OverDriveTuple existingRecord = recordsMap.get(fromAPITouple.getRecordKey());
                 if(existingRecord != null && existingRecord.source.equals("OverDrive")) {
                     //Don't do anything except for updating "last_touched". The Marc version takes precedence.
-                    this.eContentRecordDAO.touch(existingRecord.id);
+                    this.eContentRecordDAO.touch(existingRecord.id, true);
                 } else {
 
                     if(existingRecord == null) {
@@ -247,21 +247,48 @@ public class PopulateOverDriveAPIItems
                             logger.error("Error Updating  " + overDriveId + "API Item to the Database: ", e);
                         }
                     }  else {
-                        this.eContentRecordDAO.touch(existingRecord.id);
+                        this.eContentRecordDAO.touch(existingRecord.id, true);
                         logger.debug("Skip record[" + overDriveId+"] nothing to do.");
                     }
                 }
 			}
 		}
 
-        // Delete any that didn't get touched
-        PreparedStatement markUntouchedOverDriveAsDeleted = this.econtentConnection.prepareStatement(
-            "UPDATE econtent_record er " +
-            "SET `status` = 'deleted' " +
-            "WHERE last_touched < DATE_SUB(NOW(), INTERVAL 20 HOUR) AND source = 'OverDrive' OR source = 'OverDrive API'"
+        PreparedStatement selectUntouchedOverDrive = this.econtentConnection.prepareStatement(
+                "SELECT er.id, er.external_id " +
+                "FROM  econtent_record er " +
+                "WHERE last_touched < DATE_SUB(NOW(), INTERVAL 4 HOUR) AND (source = 'OverDrive' OR source = 'OverDrive API') AND status = 'active'"
         );
+        ResultSet rs = selectUntouchedOverDrive.executeQuery();
+        while(rs.next()) {
+            try {
+                //Double check because sometimes the OverDrive API just fails
+                int eId = rs.getInt(1);
+                String overDriveId = rs.getString(2);
+                boolean isOwned = false;
+                if(overDriveId != null && !overDriveId.equals(""))      {
+                    JSONObject itemMetadata = this.overDriveApiServices.getItemMetadata(overDriveId);
+                    isOwned = Boolean.parseBoolean(itemMetadata.get("isOwnedByCollections").toString());
+                }
 
-        markUntouchedOverDriveAsDeleted.execute();
+                if(!isOwned)
+                {
+                    // Delete any that didn't get touched
+                    PreparedStatement markUntouchedOverDriveAsDeleted = this.econtentConnection.prepareStatement(
+                            "UPDATE econtent_record er " +
+                                    "SET `status` = 'deleted' " +
+                                    "WHERE last_touched < DATE_SUB(NOW(), INTERVAL 4 HOUR) AND (source = 'OverDrive' OR source = 'OverDrive API') AND er.Id = ?"
+                    );
+                    markUntouchedOverDriveAsDeleted.setInt(1, eId);
+                    markUntouchedOverDriveAsDeleted.execute();
+                } else {
+                    int ii = 0;
+                }
+
+            } catch(Exception e){}
+
+        }
+
 
 		logger.info("Processed " + j + " items from OverDrive API");
 		logger.info("Finished getting OverDrive API Collection");

@@ -106,7 +106,7 @@ public class OverDriveEContentRecord extends EContentRecord {
         if(overDriveId != null && overDriveId.length()>0) {
             return overDriveId;
         }
-        String sourceUrl = getString("sourceUrl");
+        String sourceUrl = getString("sourceUrl").toUpperCase();
         if (sourceUrl == null || sourceUrl.length() == 0) {
             return null;
         }

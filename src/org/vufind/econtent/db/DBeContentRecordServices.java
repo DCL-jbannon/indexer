@@ -170,16 +170,18 @@ public class DBeContentRecordServices implements IDBeContentRecordServices
 	}
 
     private PreparedStatement touchRecordStatement = null;
-    public Boolean touch(String recordId) throws SQLException {
+    public Boolean touch(String recordId, boolean isActive) throws SQLException {
         if (touchRecordStatement == null) {
             touchRecordStatement = this.conn.prepareStatement(
                     "UPDATE `econtent_record` " +
-                            "	  SET `last_touched` = NOW()" +
+                            "	  SET `last_touched` = NOW(), `status`=?" +
                             "	  WHERE `id` = ?");
         }
-        touchRecordStatement.setString(1, recordId);
+        touchRecordStatement.setString(1, isActive ? "active" : "deleted");
+        touchRecordStatement.setString(2, recordId);
         touchRecordStatement.execute();
 
         return true;
     }
+
 }

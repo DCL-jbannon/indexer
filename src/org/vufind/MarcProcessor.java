@@ -11,7 +11,6 @@ import org.solrmarc.tools.Utils;
 import org.vufind.config.DynamicConfig;
 import org.vufind.config.sections.BasicConfigOptions;
 import org.vufind.config.sections.MarcConfigOptions;
-import org.vufind.processors.IMarcRecordProcessor;
 
 import java.io.*;
 import java.lang.reflect.Method;
@@ -51,7 +50,7 @@ public class MarcProcessor {
      */
     HashMap<String, Map<String, String>> translationMaps = new HashMap<String, Map<String, String>>();
     private String marcEncoding = "UTF8";
-    private HashMap<String, MarcIndexInfo> marcIndexInfo = new HashMap<String, MarcIndexInfo>();
+    private HashMap<String, MarcIndexInfo> existingMarcRecordsInDB = new HashMap<String, MarcIndexInfo>();
     /**
      * map of custom methods. keys are names of custom methods; values are the
      * methods to call for that custom method
@@ -142,14 +141,14 @@ public class MarcProcessor {
 
 		try {
 			//PreparedStatement existingRecordChecksumsStmt = vufindConn.prepareStatement("SELECT * FROM marc_import");
-            PreparedStatement existingRecordChecksumsStmt = vufindConn.prepareStatement("SELECT record_id as id, marc_checksum as checksum, source  FROM resource");
+            PreparedStatement existingRecordChecksumsStmt = vufindConn.prepareStatement("SELECT record_id as id, marc_checksum as checksum, source  FROM resource WHERE source != 'eContent'");
 			ResultSet existingRecordChecksumsRS = existingRecordChecksumsStmt.executeQuery();
 			while (existingRecordChecksumsRS.next()) {
 				MarcIndexInfo marcInfo = new MarcIndexInfo();
 				marcInfo.setChecksum(existingRecordChecksumsRS.getLong("checksum"));
                 String source = existingRecordChecksumsRS.getString("source");
 				marcInfo.setEContent(source!=null && source.equals("eContent"));
-				marcIndexInfo.put(existingRecordChecksumsRS.getString("id"), marcInfo);
+				existingMarcRecordsInDB.put(existingRecordChecksumsRS.getString("id"), marcInfo);
 			}
 		} catch (SQLException e) {
 			logger.error("Unable to load checksums for existing records", e);
@@ -528,8 +527,8 @@ public class MarcProcessor {
             logger.debug("Record is deleted");
             return RecordStatus.RECORD_DELETED;
 
-        } else if (marcIndexInfo.containsKey(marcInfo.getId())) {
-            marcFromIndex = marcIndexInfo.get(marcInfo.getId());
+        } else if (existingMarcRecordsInDB.containsKey(marcInfo.getId())) {
+            marcFromIndex = existingMarcRecordsInDB.get(marcInfo.getId());
             if (marcInfo.getChecksum() != marcFromIndex.getChecksum()){
                 logger.debug("Record is changed - checksum");
                 return RecordStatus.RECORD_CHANGED;

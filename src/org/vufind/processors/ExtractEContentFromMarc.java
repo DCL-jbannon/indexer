@@ -127,7 +127,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
                     "contents = ?, subject = ?, language = ?, publisher = ?, edition = ?, isbn = ?, issn = ?, upc = ?, " +
                     "lccn = ?, topic = ?, genre = ?, region = ?, era = ?, target_audience = ?, sourceUrl = ?, " +
                     "purchaseUrl = ?, publishDate = ?, marcControlField = ?, accessType = ?, date_updated = ?, " +
-                    "marcRecord = ?, external_id = ? " +
+                    "marcRecord = ?, external_id = ?, `status` = 'active' " +
                     "WHERE id = ?");
             deleteEContentRecord = econtentConn.prepareStatement("DELETE FROM econtent_record WHERE ilsId = ?");
             markEContentRecordDeleted = econtentConn.prepareStatement("UPDATE econtent_record SET status = 'deleted' WHERE ilsId = ?");
@@ -157,7 +157,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 
 	public boolean processMarcRecord(MarcRecordDetails recordInfo) {
 		try {
-            logger.debug("Processing record: "+recordInfo.getId());
+            logger.debug("Processing E-content Record: "+recordInfo.getId());
 
             String ilsId = recordInfo.getId();
 
