@@ -257,7 +257,7 @@ public class PopulateOverDriveAPIItems
         PreparedStatement selectUntouchedOverDrive = this.econtentConnection.prepareStatement(
                 "SELECT er.id, er.external_id " +
                 "FROM  econtent_record er " +
-                "WHERE last_touched < DATE_SUB(NOW(), INTERVAL 4 HOUR) AND (source = 'OverDrive' OR source = 'OverDrive API') AND status = 'active'"
+                "WHERE last_touched < DATE_SUB(NOW(), INTERVAL 4 HOUR) AND (source = 'OverDrive' OR source = 'OverDriveAPI') AND status = 'active'"
         );
         ResultSet rs = selectUntouchedOverDrive.executeQuery();
         while(rs.next()) {
