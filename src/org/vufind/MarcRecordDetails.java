@@ -46,6 +46,7 @@ public class MarcRecordDetails {
 
     private ArrayList<LibrarySpecificLink> sourceUrls = new ArrayList<LibrarySpecificLink>();
     private String purchaseUrl;
+	private String coverUrl = "";
     private boolean urlsLoaded;
     private long checksum = -1;
 
@@ -197,7 +198,13 @@ public class MarcRecordDetails {
 		return purchaseUrl;
 	}
 
+	public String getCoverUrl() {
+		loadUrls();
+		return coverUrl;
+	}
+
 	public void loadUrls() {
+
 		if (urlsLoaded) return;
 		logger.debug("Loading urls from 856 field");
 		@SuppressWarnings("unchecked")
@@ -213,7 +220,15 @@ public class MarcRecordDetails {
 			if (eightFiftySixDataField.getSubfield('y') != null) {
 				text = eightFiftySixDataField.getSubfield('y').getData();
 			} else if (eightFiftySixDataField.getSubfield('z') != null) {
-				text = eightFiftySixDataField.getSubfield('z').getData();
+				String z = eightFiftySixDataField.getSubfield('z').toString();
+				if(z != null && z.toLowerCase().contains("cover")) {
+					if(url != null && url.matches("http.*\\.(?:jpe?g|png|gif)")) {
+						this.coverUrl = url;
+					}
+				} else {
+					text = z;
+				}
+
 			} else if (eightFiftySixDataField.getSubfield('3') != null) {
 				text = eightFiftySixDataField.getSubfield('3').getData();
 			} else if (url.startsWith("http://ebook.3m.com/") && url.endsWith("Click here to Download e-Book")) {

@@ -127,7 +127,7 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
                     "contents = ?, subject = ?, language = ?, publisher = ?, edition = ?, isbn = ?, issn = ?, upc = ?, " +
                     "lccn = ?, topic = ?, genre = ?, region = ?, era = ?, target_audience = ?, sourceUrl = ?, " +
                     "purchaseUrl = ?, publishDate = ?, marcControlField = ?, accessType = ?, date_updated = ?, " +
-                    "marcRecord = ?, external_id = ?, `status` = 'active' " +
+                    "marcRecord = ?, external_id = ?, `status` = 'active', cover = ? " +
                     "WHERE id = ?");
             deleteEContentRecord = econtentConn.prepareStatement("DELETE FROM econtent_record WHERE ilsId = ?");
             markEContentRecordDeleted = econtentConn.prepareStatement("UPDATE econtent_record SET status = 'deleted' WHERE ilsId = ?");
@@ -241,13 +241,15 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 				boolean recordAdded = false;
 				
 				//logger.info("ECONTENT: " + recordStatus + " " +ilsId);
-				
+
+				String coverURL = "";
+
 				logger.debug("ADDING/UPDATING ECONTENT: " + recordStatus + " " + ilsId);
                 if (importRecordIntoDatabase){
 					//Add to database
 					//logger.info("Adding ils id " + ilsId + " to the database.");
 					createEContentRecord.setString(1, recordInfo.getId());
-					createEContentRecord.setString(2, "");
+					createEContentRecord.setString(2, recordInfo.getCoverUrl());
 					createEContentRecord.setString(3, source);
 					createEContentRecord.setString(4, Util.trimTo(255, recordInfo.getFirstFieldValueInSet("title_short")));
 					createEContentRecord.setString(5, Util.trimTo(255, recordInfo.getFirstFieldValueInSet("title_sub")));
@@ -348,7 +350,9 @@ public class ExtractEContentFromMarc implements IMarcRecordProcessor, IRecordPro
 					updateEContentRecord.setLong(27, new Date().getTime() / 1000);
 					updateEContentRecord.setString(28, recordInfo.toString());
                     updateEContentRecord.setString(29, externalId);
-					updateEContentRecord.setLong(30, eContentRecordId);
+					updateEContentRecord.setString(30, recordInfo.getCoverUrl());
+
+					updateEContentRecord.setLong(31, eContentRecordId);
 					int rowsInserted = updateEContentRecord.executeUpdate();
 					if (rowsInserted != 1){
 						logger.error("Could not insert row into the database");
