@@ -277,7 +277,7 @@ public class PopulateOverDriveAPIItems
                     PreparedStatement markUntouchedOverDriveAsDeleted = this.econtentConnection.prepareStatement(
                             "UPDATE econtent_record er " +
                                     "SET `status` = 'deleted' " +
-                                    "WHERE last_touched < DATE_SUB(NOW(), INTERVAL 4 HOUR) AND (source = 'OverDrive' OR source = 'OverDrive API') AND er.Id = ?"
+                                    "WHERE last_touched < DATE_SUB(NOW(), INTERVAL 4 HOUR) AND (source = 'OverDrive' OR source = 'OverDriveAPI') AND er.Id = ?"
                     );
                     markUntouchedOverDriveAsDeleted.setInt(1, eId);
                     markUntouchedOverDriveAsDeleted.execute();
